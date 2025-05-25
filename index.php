@@ -25,7 +25,10 @@ if (!file_exists($adminFile)) {
     file_put_contents($adminFile, json_encode([
         'moovecars' => [
             'password' => password_hash('DNI/NIE_CON_LETRA_MAYUSCULA_SIN_ESPACIOS', PASSWORD_DEFAULT),
-            'role' => 'master'
+            'role' => 'master',
+            'active' => true,
+            'created_at' => time(),
+            'last_login' => null
         ]
     ], JSON_PRETTY_PRINT));
 }
@@ -50,14 +53,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $admins = json_decode(file_get_contents($adminFile), true);
 
-        if (isset($admins[$username]) && password_verify($password, $admins[$username]['password'])) {
+        if (isset($admins[$username]) && password_verify($password, $admins[$username]['password']) && ($admins[$username]['active'] ?? true)) {
             $_SESSION['admin'] = $username;
             $_SESSION['role'] = $admins[$username]['role'] ?? 'moderador';
+
+            // Actualizar último login
+            $admins[$username]['last_login'] = time();
+            file_put_contents($adminFile, json_encode($admins, JSON_PRETTY_PRINT));
+
             echo json_encode(['status' => 'success', 'role' => $_SESSION['role']]);
             exit;
         }
 
-        echo json_encode(['status' => 'error', 'message' => 'Credenciales incorrectas']);
+        echo json_encode(['status' => 'error', 'message' => 'Credenciales incorrectas o cuenta desactivada']);
         exit;
     }
 
@@ -260,6 +268,112 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             echo json_encode(['status' => 'success', 'data' => []]);
         }
+        exit;
+    }
+
+    // Obtener lista de moderadores (solo master)
+    if (isset($_POST['action']) && $_POST['action'] === 'obtener_moderadores' && isset($_SESSION['admin']) && $_SESSION['role'] === 'master') {
+        $admins = json_decode(file_get_contents($adminFile), true);
+        $profiles = json_decode(file_get_contents($profilesFile), true) ?: [];
+
+        // Filtrar para no mostrar el master actual ni las contraseñas
+        $moderadores = [];
+        foreach ($admins as $username => $data) {
+            if ($username !== $_SESSION['admin']) {
+                $modData = [
+                    'username' => $username,
+                    'role' => $data['role'],
+                    'active' => $data['active'] ?? true,
+                    'created_at' => $data['created_at'] ?? null,
+                    'last_login' => $data['last_login'] ?? null
+                ];
+
+                // Añadir datos del perfil si existen
+                if (isset($profiles[$username])) {
+                    $modData['profile'] = $profiles[$username];
+                }
+
+                $moderadores[] = $modData;
+            }
+        }
+
+        echo json_encode(['status' => 'success', 'data' => $moderadores]);
+        exit;
+    }
+
+    // Añadir nuevo moderador (solo master)
+    if (isset($_POST['action']) && $_POST['action'] === 'agregar_moderador' && isset($_SESSION['admin']) && $_SESSION['role'] === 'master') {
+        $username = trim($_POST['username'] ?? '');
+        $password = $_POST['password'] ?? '';
+        $role = $_POST['role'] ?? 'moderador';
+
+        if (empty($username) || empty($password)) {
+            echo json_encode(['status' => 'error', 'message' => 'Usuario y contraseña son obligatorios']);
+            exit;
+        }
+
+        $admins = json_decode(file_get_contents($adminFile), true);
+
+        if (isset($admins[$username])) {
+            echo json_encode(['status' => 'error', 'message' => 'El usuario ya existe']);
+            exit;
+        }
+
+        $admins[$username] = [
+            'password' => password_hash($password, PASSWORD_DEFAULT),
+            'role' => $role,
+            'active' => true,
+            'created_at' => time(),
+            'last_login' => null
+        ];
+
+        file_put_contents($adminFile, json_encode($admins, JSON_PRETTY_PRINT));
+        echo json_encode(['status' => 'success']);
+        exit;
+    }
+
+    // Actualizar moderador (solo master)
+    if (isset($_POST['action']) && $_POST['action'] === 'actualizar_moderador' && isset($_SESSION['admin']) && $_SESSION['role'] === 'master') {
+        $username = trim($_POST['username'] ?? '');
+        $role = $_POST['role'] ?? 'moderador';
+        $active = isset($_POST['active']) ? (bool)$_POST['active'] : true;
+
+        $admins = json_decode(file_get_contents($adminFile), true);
+
+        if (!isset($admins[$username]) || $username === $_SESSION['admin']) {
+            echo json_encode(['status' => 'error', 'message' => 'Usuario no válido']);
+            exit;
+        }
+
+        $admins[$username]['role'] = $role;
+        $admins[$username]['active'] = $active;
+
+        file_put_contents($adminFile, json_encode($admins, JSON_PRETTY_PRINT));
+        echo json_encode(['status' => 'success']);
+        exit;
+    }
+
+    // Actualizar contraseña de moderador (solo master)
+    if (isset($_POST['action']) && $_POST['action'] === 'actualizar_password' && isset($_SESSION['admin']) && $_SESSION['role'] === 'master') {
+        $username = trim($_POST['username'] ?? '');
+        $password = $_POST['password'] ?? '';
+
+        if (empty($password)) {
+            echo json_encode(['status' => 'error', 'message' => 'La contraseña no puede estar vacía']);
+            exit;
+        }
+
+        $admins = json_decode(file_get_contents($adminFile), true);
+
+        if (!isset($admins[$username]) || $username === $_SESSION['admin']) {
+            echo json_encode(['status' => 'error', 'message' => 'Usuario no válido']);
+            exit;
+        }
+
+        $admins[$username]['password'] = password_hash($password, PASSWORD_DEFAULT);
+
+        file_put_contents($adminFile, json_encode($admins, JSON_PRETTY_PRINT));
+        echo json_encode(['status' => 'success']);
         exit;
     }
 }
@@ -859,6 +973,52 @@ if ($isAdmin) {
       background-color: #f5f5f5;
     }
 
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 15px;
+    }
+
+    th, td {
+      padding: 8px;
+      text-align: left;
+      border-bottom: 1px solid #ddd;
+    }
+
+    th {
+      background-color: #f2f2f2;
+      font-weight: 500;
+    }
+
+    tr:hover {
+      background-color: #f5f5f5;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.8em;
+      font-weight: bold;
+      color: white;
+    }
+
+    .badge-master {
+      background-color: var(--master-color);
+    }
+
+    .badge-moderator {
+      background-color: var(--moderator-color);
+    }
+
+    .badge-active {
+      background-color: var(--success-color);
+    }
+
+    .badge-inactive {
+      background-color: var(--delete-color);
+    }
+
     @media (min-width: 481px) {
       h1 {
         font-size: 2rem;
@@ -975,6 +1135,7 @@ if ($isAdmin) {
     <div>
       <button class="profile" onclick="mostrarPerfil()">Perfil</button>
       <?php if ($role === 'master'): ?>
+        <button onclick="mostrarModeradores()">Moderadores</button>
         <button class="master" onclick="mostrarVaciarPlazas()">Vaciar Plazas</button>
       <?php endif; ?>
       <button onclick="logout()">Cerrar sesión</button>
@@ -1153,6 +1314,89 @@ if ($isAdmin) {
       <div class="popup-actions">
         <button class="cancel" onclick="cerrarPopup('popupVaciarPlazas')">Cancelar</button>
         <button class="master" onclick="vaciarTodasLasPlazas()">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="popupModeradores" class="popup">
+    <div class="popup-content">
+      <button class="popup-close" onclick="cerrarPopup('popupModeradores')">×</button>
+      <h2>Gestión de Moderadores</h2>
+
+      <div class="controls" style="margin-bottom: 15px;">
+        <button onclick="mostrarAgregarModerador()">➕ Añadir Moderador</button>
+      </div>
+
+      <div id="listaModeradores"></div>
+    </div>
+  </div>
+
+  <div id="popupAgregarModerador" class="popup">
+    <div class="popup-content">
+      <button class="popup-close" onclick="cerrarPopup('popupAgregarModerador')">×</button>
+      <h2>Añadir Nuevo Moderador</h2>
+
+      <label for="nuevoModeradorUsuario">Usuario:</label>
+      <input type="text" id="nuevoModeradorUsuario" placeholder="Nombre de usuario">
+
+      <label for="nuevoModeradorPassword">Contraseña:</label>
+      <input type="password" id="nuevoModeradorPassword" placeholder="Contraseña">
+
+      <label for="nuevoModeradorRol">Rol:</label>
+      <select id="nuevoModeradorRol">
+        <option value="moderador">Moderador</option>
+        <option value="master">Master</option>
+      </select>
+
+      <div class="popup-actions">
+        <button class="cancel" onclick="cerrarPopup('popupAgregarModerador')">Cancelar</button>
+        <button onclick="agregarModerador()">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="popupEditarModerador" class="popup">
+    <div class="popup-content">
+      <button class="popup-close" onclick="cerrarPopup('popupEditarModerador')">×</button>
+      <h2>Editar Moderador</h2>
+      <input type="hidden" id="editarModeradorUsuario">
+
+      <div id="moderadorInfo" class="profile-info"></div>
+
+      <label for="editarModeradorRol">Rol:</label>
+      <select id="editarModeradorRol">
+        <option value="moderador">Moderador</option>
+        <option value="master">Master</option>
+      </select>
+
+      <label for="editarModeradorActivo">Estado:</label>
+      <select id="editarModeradorActivo">
+        <option value="1">Activo</option>
+        <option value="0">Inactivo</option>
+      </select>
+
+      <div class="popup-actions">
+        <button onclick="mostrarCambiarPassword()">Cambiar Contraseña</button>
+        <button onclick="actualizarModerador()">Guardar Cambios</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="popupCambiarPassword" class="popup">
+    <div class="popup-content">
+      <button class="popup-close" onclick="cerrarPopup('popupCambiarPassword')">×</button>
+      <h2>Cambiar Contraseña</h2>
+      <input type="hidden" id="cambiarPasswordUsuario">
+
+      <label for="nuevaPassword">Nueva Contraseña:</label>
+      <input type="password" id="nuevaPassword" placeholder="Nueva contraseña">
+
+      <label for="confirmarPassword">Confirmar Contraseña:</label>
+      <input type="password" id="confirmarPassword" placeholder="Confirmar contraseña">
+
+      <div class="popup-actions">
+        <button class="cancel" onclick="cerrarPopup('popupCambiarPassword')">Cancelar</button>
+        <button onclick="cambiarPasswordModerador()">Guardar</button>
       </div>
     </div>
   </div>
@@ -1768,6 +2012,245 @@ if ($isAdmin) {
         } else {
           suggestionsContainer.style.display = 'none';
         }
+      });
+    }
+
+    function mostrarModeradores() {
+      if (role !== 'master') return;
+
+      fetch('index.php', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: 'action=obtener_moderadores'
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === 'success') {
+          mostrarListaModeradores(data.data);
+          mostrarPopup('popupModeradores');
+        } else {
+          alert('Error al cargar moderadores');
+        }
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        alert('Error de conexión');
+      });
+    }
+
+    function mostrarListaModeradores(moderadores) {
+      const lista = document.getElementById('listaModeradores');
+      lista.innerHTML = '';
+
+      if (moderadores.length === 0) {
+        lista.innerHTML = '<p>No hay moderadores registrados</p>';
+        return;
+      }
+
+      const table = document.createElement('table');
+      table.style.width = '100%';
+      table.style.borderCollapse = 'collapse';
+
+      // Cabecera
+      const thead = document.createElement('thead');
+      thead.innerHTML = `
+        <tr>
+          <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Usuario</th>
+          <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Rol</th>
+          <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Estado</th>
+          <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Último login</th>
+          <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Acciones</th>
+        </tr>
+      `;
+      table.appendChild(thead);
+
+      // Cuerpo
+      const tbody = document.createElement('tbody');
+      moderadores.forEach(mod => {
+        const tr = document.createElement('tr');
+        tr.style.borderBottom = '1px solid #eee';
+
+        // Estado como badge
+        const estado = mod.active ?
+          '<span class="badge badge-active">✔ Activo</span>' :
+          '<span class="badge badge-inactive">✖ Inactivo</span>';
+
+        // Rol como badge
+        const rolClass = mod.role === 'master' ? 'badge-master' : 'badge-moderator';
+        const rol = `<span class="badge ${rolClass}">${mod.role.toUpperCase()}</span>`;
+
+        // Último login formateado
+        const lastLogin = mod.last_login ? formatDate(mod.last_login) : 'Nunca';
+
+        tr.innerHTML = `
+          <td style="padding: 8px;">${mod.username}</td>
+          <td style="padding: 8px;">${rol}</td>
+          <td style="padding: 8px;">${estado}</td>
+          <td style="padding: 8px;">${lastLogin}</td>
+          <td style="padding: 8px;">
+            <button style="padding: 4px 8px; font-size: 12px;" onclick="editarModerador('${mod.username}')">Editar</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+      lista.appendChild(table);
+    }
+
+    function mostrarAgregarModerador() {
+      document.getElementById('nuevoModeradorUsuario').value = '';
+      document.getElementById('nuevoModeradorPassword').value = '';
+      document.getElementById('nuevoModeradorRol').value = 'moderador';
+      mostrarPopup('popupAgregarModerador');
+    }
+
+    function agregarModerador() {
+      const username = document.getElementById('nuevoModeradorUsuario').value.trim();
+      const password = document.getElementById('nuevoModeradorPassword').value;
+      const role = document.getElementById('nuevoModeradorRol').value;
+
+      if (!username || !password) {
+        alert('Usuario y contraseña son obligatorios');
+        return;
+      }
+
+      fetch('index.php', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: `action=agregar_moderador&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&role=${encodeURIComponent(role)}`
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === 'success') {
+          alert('Moderador agregado correctamente');
+          cerrarPopup('popupAgregarModerador');
+          mostrarModeradores(); // Actualizar lista
+        } else {
+          alert('Error: ' + (data.message || 'Error desconocido'));
+        }
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        alert('Error de conexión');
+      });
+    }
+
+    function editarModerador(username) {
+      fetch('index.php', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: `action=obtener_moderadores`
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === 'success') {
+          const moderador = data.data.find(m => m.username === username);
+          if (moderador) {
+            document.getElementById('editarModeradorUsuario').value = username;
+            document.getElementById('editarModeradorRol').value = moderador.role;
+            document.getElementById('editarModeradorActivo').value = moderador.active ? '1' : '0';
+
+            // Mostrar información del perfil
+            const infoDiv = document.getElementById('moderadorInfo');
+            if (moderador.profile) {
+              infoDiv.innerHTML = `
+                <p><strong>Nombre:</strong> ${moderador.profile.nombre || 'No especificado'}</p>
+                <p><strong>Apellidos:</strong> ${moderador.profile.apellidos || 'No especificados'}</p>
+                <p><strong>Email:</strong> ${moderador.profile.email || 'No especificado'}</p>
+                <p><strong>Teléfono:</strong> ${moderador.profile.telefono || 'No especificado'}</p>
+                <p><strong>Registrado:</strong> ${formatDate(moderador.created_at)}</p>
+                <p><strong>Último login:</strong> ${moderador.last_login ? formatDate(moderador.last_login) : 'Nunca'}</p>
+              `;
+            } else {
+              infoDiv.innerHTML = '<p>No hay información de perfil disponible</p>';
+            }
+
+            mostrarPopup('popupEditarModerador');
+          }
+        }
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        alert('Error al cargar datos del moderador');
+      });
+    }
+
+    function actualizarModerador() {
+      const username = document.getElementById('editarModeradorUsuario').value;
+      const role = document.getElementById('editarModeradorRol').value;
+      const active = document.getElementById('editarModeradorActivo').value === '1';
+
+      fetch('index.php', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: `action=actualizar_moderador&username=${encodeURIComponent(username)}&role=${encodeURIComponent(role)}&active=${active ? '1' : '0'}`
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === 'success') {
+          alert('Moderador actualizado correctamente');
+          mostrarModeradores(); // Actualizar lista
+          cerrarPopup('popupEditarModerador');
+        } else {
+          alert('Error: ' + (data.message || 'Error desconocido'));
+        }
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        alert('Error de conexión');
+      });
+    }
+
+    function mostrarCambiarPassword() {
+      const username = document.getElementById('editarModeradorUsuario').value;
+      document.getElementById('cambiarPasswordUsuario').value = username;
+      document.getElementById('nuevaPassword').value = '';
+      document.getElementById('confirmarPassword').value = '';
+      mostrarPopup('popupCambiarPassword');
+    }
+
+    function cambiarPasswordModerador() {
+      const username = document.getElementById('cambiarPasswordUsuario').value;
+      const password = document.getElementById('nuevaPassword').value;
+      const confirmPassword = document.getElementById('confirmarPassword').value;
+
+      if (!password) {
+        alert('La contraseña no puede estar vacía');
+        return;
+      }
+
+      if (password !== confirmPassword) {
+        alert('Las contraseñas no coinciden');
+        return;
+      }
+
+      fetch('index.php', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: `action=actualizar_password&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === 'success') {
+          alert('Contraseña actualizada correctamente');
+          cerrarPopup('popupCambiarPassword');
+        } else {
+          alert('Error: ' + (data.message || 'Error desconocido'));
+        }
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        alert('Error de conexión');
       });
     }
 
