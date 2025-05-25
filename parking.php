@@ -216,6 +216,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $coches = json_decode(file_get_contents($jsonFile), true) ?: [];
 $blocked = json_decode(file_get_contents($blockedFile), true) ?: [];
 $isAdmin = isset($_SESSION['admin']);
+
+// Obtener nombre del admin para la bienvenida
+$adminName = '';
+if ($isAdmin) {
+    $profiles = json_decode(file_get_contents($profilesFile), true) ?: [];
+    if (isset($profiles[$_SESSION['admin']])) {
+        $adminName = $profiles[$_SESSION['admin']]['nombre'] ?? $_SESSION['admin'];
+    } else {
+        $adminName = $_SESSION['admin'];
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -864,7 +875,7 @@ $isAdmin = isset($_SESSION['admin']);
 <body>
   <?php if ($isAdmin): ?>
   <div class="admin-bar">
-    <span>Modo Admin: <?php echo htmlspecialchars($_SESSION['admin']); ?></span>
+    <span>Modo Admin: <?php echo htmlspecialchars($adminName); ?></span>
     <div>
       <button class="profile" onclick="mostrarPerfil()">Perfil</button>
       <button onclick="logout()">Cerrar sesión</button>
@@ -1244,19 +1255,19 @@ $isAdmin = isset($_SESSION['admin']);
 
         // Aplicar filtro
         if (filtroActual === 'ocupadas') {
-          if (!matriculaEnPlaza) {
+          if (!div.classList.contains('ocupada')) {
             div.style.display = 'none';
           } else {
             div.style.display = 'flex';
           }
         } else if (filtroActual === 'libres') {
-          if (matriculaEnPlaza || blockedPlazas[i]) {
+          if (div.classList.contains('ocupada') || div.classList.contains('bloqueada')) {
             div.style.display = 'none';
           } else {
             div.style.display = 'flex';
           }
         } else if (filtroActual === 'bloqueadas') {
-          if (!blockedPlazas[i]) {
+          if (!div.classList.contains('bloqueada')) {
             div.style.display = 'none';
           } else {
             div.style.display = 'flex';
