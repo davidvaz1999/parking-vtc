@@ -1264,7 +1264,7 @@ if ($isAdmin) {
       const user = document.getElementById('loginUser').value;
       const pass = document.getElementById('loginPass').value;
 
-      fetch('parking.php', {
+      fetch('index.php', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded'
@@ -1286,7 +1286,7 @@ if ($isAdmin) {
     }
 
     function logout() {
-      fetch('parking.php', {
+      fetch('index.php', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded'
@@ -1299,7 +1299,7 @@ if ($isAdmin) {
     function toggleBlockPlaza(plaza) {
       if (!isAdmin) return;
 
-      fetch('parking.php', {
+      fetch('index.php', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded'
@@ -1474,7 +1474,7 @@ if ($isAdmin) {
       const fechaInicio = document.getElementById('historialFechaInicio').value;
       const fechaFin = document.getElementById('historialFechaFin').value;
 
-      fetch('parking.php', {
+      fetch('index.php', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded'
@@ -1551,7 +1551,7 @@ if ($isAdmin) {
         }
       }
 
-      fetch('parking.php', {
+      fetch('index.php', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded'
@@ -1598,7 +1598,7 @@ if ($isAdmin) {
         return;
       }
 
-      fetch('parking.php', {
+      fetch('index.php', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded'
@@ -1637,7 +1637,7 @@ if ($isAdmin) {
         return;
       }
 
-      fetch('parking.php', {
+      fetch('index.php', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded'
@@ -1664,7 +1664,7 @@ if ($isAdmin) {
     }
 
     function mostrarPerfil() {
-      fetch('parking.php', {
+      fetch('index.php', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded'
@@ -1712,7 +1712,7 @@ if ($isAdmin) {
         telefono: document.getElementById('perfilTelefono').value.trim()
       };
 
-      fetch('parking.php', {
+      fetch('index.php', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded'
@@ -1740,7 +1740,7 @@ if ($isAdmin) {
         return;
       }
 
-      fetch('parking.php', {
+      fetch('index.php', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded'
