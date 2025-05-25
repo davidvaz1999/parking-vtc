@@ -1011,6 +1011,31 @@ $isAdmin = isset($_SESSION['admin']);
       return date.toLocaleString('es-ES', opciones);
     }
 
+    function formatDuration(timestamp) {
+      const ahora = Math.floor(Date.now() / 1000);
+      const segundos = ahora - timestamp;
+
+      if (segundos < 60) {
+        return `${segundos} segundos`;
+      }
+
+      const minutos = Math.floor(segundos / 60);
+      if (minutos < 60) {
+        return `${minutos} minutos`;
+      }
+
+      const horas = Math.floor(minutos / 60);
+      const minutosRestantes = minutos % 60;
+
+      if (horas < 24) {
+        return `${horas}h ${minutosRestantes}m`;
+      }
+
+      const dias = Math.floor(horas / 24);
+      const horasRestantes = horas % 24;
+      return `${dias}d ${horasRestantes}h`;
+    }
+
     function actualizarEstadisticas() {
       const ocupadas = Object.keys(coches).length;
       const bloqueadas = Object.keys(blockedPlazas).length;
@@ -1117,8 +1142,8 @@ $isAdmin = isset($_SESSION['admin']);
               info.className = 'plaza-info';
               info.innerHTML = `
                 <div>${matriculaEnPlaza[0]}</div>
-                <div>${formatTime(matriculaEnPlaza[1].timestamp)}</div>
-                <div>${Math.round(horasOcupacion * 10) / 10}h</div>
+                <div>${formatDate(matriculaEnPlaza[1].timestamp)}</div>
+                <div>${formatDuration(matriculaEnPlaza[1].timestamp)}</div>
               `;
               div.appendChild(info);
             }
