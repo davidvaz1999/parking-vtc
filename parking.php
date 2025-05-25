@@ -11,6 +11,7 @@ $jsonFile = 'coches.json';
 $historyFile = 'historial.json';
 $adminFile = 'admin.json';
 $blockedFile = 'blocked.json';
+$profilesFile = 'profiles.json';
 
 // Crear archivos si no existen
 if (!file_exists($jsonFile)) {
@@ -26,6 +27,9 @@ if (!file_exists($adminFile)) {
 }
 if (!file_exists($blockedFile)) {
     file_put_contents($blockedFile, json_encode([]));
+}
+if (!file_exists($profilesFile)) {
+    file_put_contents($profilesFile, json_encode([]));
 }
 
 // Manejo de solicitudes AJAX
@@ -177,6 +181,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         echo json_encode(['status' => 'success', 'data' => array_values($historial)]);
         exit;
     }
+
+    // Guardar perfil de administrador
+    if (isset($_POST['action']) && $_POST['action'] === 'guardar_perfil' && isset($_SESSION['admin'])) {
+        $profiles = json_decode(file_get_contents($profilesFile), true) ?: [];
+
+        $profiles[$_SESSION['admin']] = [
+            'nombre' => $_POST['nombre'] ?? '',
+            'apellidos' => $_POST['apellidos'] ?? '',
+            'email' => $_POST['email'] ?? '',
+            'telefono' => $_POST['telefono'] ?? '',
+            'actualizado' => time()
+        ];
+
+        file_put_contents($profilesFile, json_encode($profiles, JSON_PRETTY_PRINT));
+        echo json_encode(['status' => 'success']);
+        exit;
+    }
+
+    // Obtener perfil de administrador
+    if (isset($_POST['action']) && $_POST['action'] === 'obtener_perfil' && isset($_SESSION['admin'])) {
+        $profiles = json_decode(file_get_contents($profilesFile), true) ?: [];
+
+        if (isset($profiles[$_SESSION['admin']])) {
+            echo json_encode(['status' => 'success', 'data' => $profiles[$_SESSION['admin']]]);
+        } else {
+            echo json_encode(['status' => 'success', 'data' => []]);
+        }
+        exit;
+    }
 }
 
 // Cargar datos para JS
@@ -320,6 +353,14 @@ $isAdmin = isset($_SESSION['admin']);
 
     button.login:hover {
       background-color: #219653;
+    }
+
+    button.profile {
+      background-color: #9b59b6;
+    }
+
+    button.profile:hover {
+      background-color: #8e44ad;
     }
 
     .legend {
@@ -670,6 +711,11 @@ $isAdmin = isset($_SESSION['admin']);
       padding: 5px 10px;
       border-radius: 4px;
       cursor: pointer;
+      margin-left: 5px;
+    }
+
+    .admin-bar button.profile {
+      background-color: #9b59b6;
     }
 
     .login-button {
@@ -689,6 +735,21 @@ $isAdmin = isset($_SESSION['admin']);
       cursor: pointer;
       box-shadow: 0 2px 5px rgba(0,0,0,0.2);
       z-index: 10;
+    }
+
+    .profile-info {
+      margin-bottom: 15px;
+      padding: 10px;
+      background-color: #f8f9fa;
+      border-radius: 5px;
+    }
+
+    .profile-info p {
+      margin-bottom: 5px;
+    }
+
+    .profile-info strong {
+      color: var(--primary-color);
     }
 
     @media (min-width: 481px) {
@@ -804,7 +865,10 @@ $isAdmin = isset($_SESSION['admin']);
   <?php if ($isAdmin): ?>
   <div class="admin-bar">
     <span>Modo Admin: <?php echo htmlspecialchars($_SESSION['admin']); ?></span>
-    <button onclick="logout()">Cerrar sesión</button>
+    <div>
+      <button class="profile" onclick="mostrarPerfil()">Perfil</button>
+      <button onclick="logout()">Cerrar sesión</button>
+    </div>
   </div>
   <?php endif; ?>
 
@@ -940,6 +1004,32 @@ $isAdmin = isset($_SESSION['admin']);
         <button onclick="filtrarHistorial()">BUSCAR</button>
       </div>
       <div id="historialContenido"></div>
+    </div>
+  </div>
+
+  <div id="popupPerfil" class="popup">
+    <div class="popup-content">
+      <button class="popup-close" onclick="cerrarPopup('popupPerfil')">×</button>
+      <h2>Perfil de Administrador</h2>
+      <div id="perfilInfo" class="profile-info"></div>
+      <form id="formPerfil">
+        <label for="perfilNombre">Nombre:</label>
+        <input type="text" id="perfilNombre" placeholder="Nombre">
+
+        <label for="perfilApellidos">Apellidos:</label>
+        <input type="text" id="perfilApellidos" placeholder="Apellidos">
+
+        <label for="perfilEmail">Correo electrónico:</label>
+        <input type="email" id="perfilEmail" placeholder="Correo electrónico">
+
+        <label for="perfilTelefono">Teléfono móvil:</label>
+        <input type="tel" id="perfilTelefono" placeholder="Teléfono móvil">
+
+        <div class="popup-actions">
+          <button type="button" class="cancel" onclick="cerrarPopup('popupPerfil')">Cancelar</button>
+          <button type="button" onclick="guardarPerfil()">Guardar</button>
+        </div>
+      </form>
     </div>
   </div>
 
@@ -1153,12 +1243,24 @@ $isAdmin = isset($_SESSION['admin']);
         }
 
         // Aplicar filtro
-        if (filtroActual === 'ocupadas' && !matriculaEnPlaza) {
-          div.style.display = 'none';
-        } else if (filtroActual === 'libres' && (matriculaEnPlaza || blockedPlazas[i])) {
-          div.style.display = 'none';
-        } else if (filtroActual === 'bloqueadas' && !blockedPlazas[i]) {
-          div.style.display = 'none';
+        if (filtroActual === 'ocupadas') {
+          if (!matriculaEnPlaza) {
+            div.style.display = 'none';
+          } else {
+            div.style.display = 'flex';
+          }
+        } else if (filtroActual === 'libres') {
+          if (matriculaEnPlaza || blockedPlazas[i]) {
+            div.style.display = 'none';
+          } else {
+            div.style.display = 'flex';
+          }
+        } else if (filtroActual === 'bloqueadas') {
+          if (!blockedPlazas[i]) {
+            div.style.display = 'none';
+          } else {
+            div.style.display = 'flex';
+          }
         } else {
           div.style.display = 'flex';
         }
@@ -1389,6 +1491,77 @@ $isAdmin = isset($_SESSION['admin']);
           document.querySelectorAll('.plaza').forEach(p => p.classList.remove('resaltada'));
         } else {
           alert('Error al eliminar: ' + (data.message || 'Matrícula no encontrada'));
+        }
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        alert('Error de conexión');
+      });
+    }
+
+    function mostrarPerfil() {
+      fetch('parking.php', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: 'action=obtener_perfil'
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === 'success') {
+          const perfil = data.data;
+          const perfilInfo = document.getElementById('perfilInfo');
+
+          if (Object.keys(perfil).length > 0) {
+            perfilInfo.innerHTML = `
+              <p><strong>Nombre:</strong> ${perfil.nombre || 'No especificado'}</p>
+              <p><strong>Apellidos:</strong> ${perfil.apellidos || 'No especificados'}</p>
+              <p><strong>Email:</strong> ${perfil.email || 'No especificado'}</p>
+              <p><strong>Teléfono:</strong> ${perfil.telefono || 'No especificado'}</p>
+              <p><strong>Última actualización:</strong> ${formatDate(perfil.actualizado)}</p>
+            `;
+          } else {
+            perfilInfo.innerHTML = '<p>No hay información de perfil guardada.</p>';
+          }
+
+          // Rellenar los campos del formulario
+          document.getElementById('perfilNombre').value = perfil.nombre || '';
+          document.getElementById('perfilApellidos').value = perfil.apellidos || '';
+          document.getElementById('perfilEmail').value = perfil.email || '';
+          document.getElementById('perfilTelefono').value = perfil.telefono || '';
+
+          mostrarPopup('popupPerfil');
+        }
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        alert('Error al cargar el perfil');
+      });
+    }
+
+    function guardarPerfil() {
+      const perfil = {
+        nombre: document.getElementById('perfilNombre').value.trim(),
+        apellidos: document.getElementById('perfilApellidos').value.trim(),
+        email: document.getElementById('perfilEmail').value.trim(),
+        telefono: document.getElementById('perfilTelefono').value.trim()
+      };
+
+      fetch('parking.php', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: `action=guardar_perfil&nombre=${encodeURIComponent(perfil.nombre)}&apellidos=${encodeURIComponent(perfil.apellidos)}&email=${encodeURIComponent(perfil.email)}&telefono=${encodeURIComponent(perfil.telefono)}`
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === 'success') {
+          alert('Perfil guardado correctamente');
+          mostrarPerfil(); // Actualizar la vista
+        } else {
+          alert('Error al guardar el perfil');
         }
       })
       .catch(error => {
