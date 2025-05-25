@@ -28,7 +28,8 @@ if (!file_exists($adminFile)) {
             'role' => 'master',
             'active' => true,
             'created_at' => time(),
-            'last_login' => null
+            'last_login' => null,
+            'reset_password' => false
         ]
     ], JSON_PRETTY_PRINT));
 }
@@ -56,12 +57,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (isset($admins[$username]) && password_verify($password, $admins[$username]['password']) && ($admins[$username]['active'] ?? true)) {
             $_SESSION['admin'] = $username;
             $_SESSION['role'] = $admins[$username]['role'] ?? 'moderador';
+            $_SESSION['reset_password'] = $admins[$username]['reset_password'] ?? false;
 
             // Actualizar último login
             $admins[$username]['last_login'] = time();
             file_put_contents($adminFile, json_encode($admins, JSON_PRETTY_PRINT));
 
-            echo json_encode(['status' => 'success', 'role' => $_SESSION['role']]);
+            echo json_encode(['status' => 'success', 'role' => $_SESSION['role'], 'reset_password' => $_SESSION['reset_password']]);
             exit;
         }
 
@@ -73,6 +75,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['action']) && $_POST['action'] === 'logout') {
         unset($_SESSION['admin']);
         unset($_SESSION['role']);
+        unset($_SESSION['reset_password']);
         session_destroy();
         echo json_encode(['status' => 'success']);
         exit;
@@ -82,7 +85,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['action']) && $_POST['action'] === 'toggle_block' && isset($_SESSION['admin'])) {
         $plaza = intval($_POST['plaza'] ?? 0);
 
-        if ($plaza > 0 && $plaza <= 800) {
+        if ($plaza > 0 && $plaza <= 900) {
             $blocked = json_decode(file_get_contents($blockedFile), true) ?: [];
 
             if (isset($blocked[$plaza])) {
@@ -106,7 +109,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $plaza = intval($_POST['plaza'] ?? 0);
 
         // Validación
-        if (preg_match('/^[0-9BCDFGHJKLMNPRSTVWXYZ]{4}[0-9BCDFGHJKLMNPRSTVWXYZ]{3}$/', $matricula) && $plaza > 0 && $plaza <= 800) {
+        if (preg_match('/^[0-9BCDFGHJKLMNPRSTVWXYZ]{4}[0-9BCDFGHJKLMNPRSTVWXYZ]{3}$/', $matricula) && $plaza > 0 && $plaza <= 900) {
             $blocked = json_decode(file_get_contents($blockedFile), true) ?: [];
 
             // Verificar si la plaza está bloqueada
@@ -285,7 +288,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'role' => $data['role'],
                     'active' => $data['active'] ?? true,
                     'created_at' => $data['created_at'] ?? null,
-                    'last_login' => $data['last_login'] ?? null
+                    'last_login' => $data['last_login'] ?? null,
+                    'reset_password' => $data['reset_password'] ?? false
                 ];
 
                 // Añadir datos del perfil si existen
@@ -324,7 +328,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'role' => $role,
             'active' => true,
             'created_at' => time(),
-            'last_login' => null
+            'last_login' => null,
+            'reset_password' => true
         ];
 
         file_put_contents($adminFile, json_encode($admins, JSON_PRETTY_PRINT));
@@ -371,6 +376,69 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         $admins[$username]['password'] = password_hash($password, PASSWORD_DEFAULT);
+        $admins[$username]['reset_password'] = false;
+
+        file_put_contents($adminFile, json_encode($admins, JSON_PRETTY_PRINT));
+        echo json_encode(['status' => 'success']);
+        exit;
+    }
+
+    // Eliminar moderador (solo master)
+    if (isset($_POST['action']) && $_POST['action'] === 'eliminar_moderador' && isset($_SESSION['admin']) && $_SESSION['role'] === 'master') {
+        $username = trim($_POST['username'] ?? '');
+
+        $admins = json_decode(file_get_contents($adminFile), true);
+        $profiles = json_decode(file_get_contents($profilesFile), true) ?: [];
+
+        if (!isset($admins[$username]) || $username === $_SESSION['admin']) {
+            echo json_encode(['status' => 'error', 'message' => 'Usuario no válido']);
+            exit;
+        }
+
+        unset($admins[$username]);
+        if (isset($profiles[$username])) {
+            unset($profiles[$username]);
+        }
+
+        file_put_contents($adminFile, json_encode($admins, JSON_PRETTY_PRINT));
+        file_put_contents($profilesFile, json_encode($profiles, JSON_PRETTY_PRINT));
+
+        echo json_encode(['status' => 'success']);
+        exit;
+    }
+
+    // Restablecer contraseña (para usuarios con reset_password)
+    if (isset($_POST['action']) && $_POST['action'] === 'restablecer_password' && isset($_SESSION['admin']) && ($_SESSION['reset_password'] ?? false)) {
+        $username = $_SESSION['admin'];
+        $current_password = $_POST['current_password'] ?? '';
+        $new_password = $_POST['new_password'] ?? '';
+        $confirm_password = $_POST['confirm_password'] ?? '';
+
+        $admins = json_decode(file_get_contents($adminFile), true);
+
+        if (!isset($admins[$username])) {
+            echo json_encode(['status' => 'error', 'message' => 'Usuario no encontrado']);
+            exit;
+        }
+
+        if (!password_verify($current_password, $admins[$username]['password'])) {
+            echo json_encode(['status' => 'error', 'message' => 'Contraseña actual incorrecta']);
+            exit;
+        }
+
+        if ($new_password !== $confirm_password) {
+            echo json_encode(['status' => 'error', 'message' => 'Las contraseñas no coinciden']);
+            exit;
+        }
+
+        if (empty($new_password)) {
+            echo json_encode(['status' => 'error', 'message' => 'La nueva contraseña no puede estar vacía']);
+            exit;
+        }
+
+        $admins[$username]['password'] = password_hash($new_password, PASSWORD_DEFAULT);
+        $admins[$username]['reset_password'] = false;
+        $_SESSION['reset_password'] = false;
 
         file_put_contents($adminFile, json_encode($admins, JSON_PRETTY_PRINT));
         echo json_encode(['status' => 'success']);
@@ -383,6 +451,7 @@ $coches = json_decode(file_get_contents($jsonFile), true) ?: [];
 $blocked = json_decode(file_get_contents($blockedFile), true) ?: [];
 $isAdmin = isset($_SESSION['admin']);
 $role = $_SESSION['role'] ?? '';
+$reset_password = $_SESSION['reset_password'] ?? false;
 
 // Obtener nombre del admin para la bienvenida
 $adminName = '';
@@ -1019,6 +1088,50 @@ if ($isAdmin) {
       background-color: var(--delete-color);
     }
 
+    .reset-password-popup {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0,0,0,0.8);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1001;
+    }
+
+    .reset-password-box {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      width: 90%;
+      max-width: 400px;
+    }
+
+    .reset-password-box h2 {
+      margin-bottom: 20px;
+      color: var(--primary-color);
+    }
+
+    .reset-password-box input {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 15px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+
+    .reset-password-box button {
+      width: 100%;
+      padding: 10px;
+      background-color: var(--secondary-color);
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
     @media (min-width: 481px) {
       h1 {
         font-size: 2rem;
@@ -1129,7 +1242,20 @@ if ($isAdmin) {
   </style>
 </head>
 <body>
-  <?php if ($isAdmin): ?>
+  <?php if ($isAdmin && $reset_password): ?>
+  <div class="reset-password-popup">
+    <div class="reset-password-box">
+      <h2>Restablecer contraseña</h2>
+      <p>Es necesario que cambies tu contraseña antes de continuar.</p>
+      <input type="password" id="currentPassword" placeholder="Contraseña actual" autocomplete="current-password">
+      <input type="password" id="newPassword" placeholder="Nueva contraseña" autocomplete="new-password">
+      <input type="password" id="confirmPassword" placeholder="Confirmar nueva contraseña" autocomplete="new-password">
+      <button onclick="restablecerPassword()">Cambiar contraseña</button>
+    </div>
+  </div>
+  <?php endif; ?>
+
+  <?php if ($isAdmin && !$reset_password): ?>
   <div class="admin-bar">
     <span>Modo Admin: Bienvenido <?php echo htmlspecialchars($adminName); ?> <span class="role-badge"><?php echo strtoupper($role); ?></span></span>
     <div>
@@ -1150,7 +1276,7 @@ if ($isAdmin) {
     <div class="stats">
       <div class="stat-card">
         <h3>Plazas totales</h3>
-        <p>800</p>
+        <p>900</p>
       </div>
       <div class="stat-card">
         <h3>Plazas ocupadas</h3>
@@ -1158,7 +1284,7 @@ if ($isAdmin) {
       </div>
       <div class="stat-card">
         <h3>Plazas libres</h3>
-        <p id="plazas-libres"><?php echo 800 - count($coches) - count($blocked); ?></p>
+        <p id="plazas-libres"><?php echo 900 - count($coches) - count($blocked); ?></p>
       </div>
       <div class="stat-card">
         <h3>Plazas bloqueadas</h3>
@@ -1233,7 +1359,9 @@ if ($isAdmin) {
       <button class="popup-close" onclick="cerrarPopup('popupCocheNoEncontrado')">×</button>
       <h2>Vehículo no encontrado</h2>
       <p>No se encontró el vehículo con matrícula <strong id="matriculaNoEncontrada"></strong> en el sistema.</p>
-      <p>¿Has introducido correctamente la matrícula?</p>
+      <p>Los vehículos estacionados en las plazas bloqueadas no están registrados en esta web, ya que son vehículos en reparación o mantenimiento, aunque podrían estar ya listos para circular.</p>
+      <p>Verifica que has escrito la matrícula correctamente o acércate a la zona de vehículos bloqueados con la aplicación GeoTab abierta.</p>
+      <p>Si lo que deseas es aparcar tu vehículo, solo pulsa "Aparcar vehículo".</p>
       <div class="popup-actions popup-actions-column">
         <button onclick="volverAIntroducirMatricula()">Matrícula incorrecta</button>
         <button onclick="mostrarPopupAparcar()">Aparcar vehículo</button>
@@ -1246,7 +1374,7 @@ if ($isAdmin) {
       <button class="popup-close" onclick="cerrarPopup('popupAparcar')">×</button>
       <h2>Aparcar vehículo</h2>
       <p>Introduce el número de plaza para la matrícula <strong id="matriculaAparcar"></strong>:</p>
-      <input type="number" id="plazaAparcar" min="1" max="800" placeholder="Número de plaza (1-800)">
+      <input type="number" id="plazaAparcar" min="1" max="900" placeholder="Número de plaza (1-900)">
       <div class="popup-actions">
         <button onclick="guardarNuevaPlaza()">Confirmar</button>
       </div>
@@ -1377,6 +1505,7 @@ if ($isAdmin) {
 
       <div class="popup-actions">
         <button onclick="mostrarCambiarPassword()">Cambiar Contraseña</button>
+        <button class="delete" onclick="eliminarModerador()">Eliminar Moderador</button>
         <button onclick="actualizarModerador()">Guardar Cambios</button>
       </div>
     </div>
@@ -1397,6 +1526,20 @@ if ($isAdmin) {
       <div class="popup-actions">
         <button class="cancel" onclick="cerrarPopup('popupCambiarPassword')">Cancelar</button>
         <button onclick="cambiarPasswordModerador()">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="popupEliminarModerador" class="popup">
+    <div class="popup-content">
+      <button class="popup-close" onclick="cerrarPopup('popupEliminarModerador')">×</button>
+      <h2>Eliminar Moderador</h2>
+      <p>¿Estás seguro de que deseas eliminar al moderador <strong id="moderadorAEliminar"></strong>?</p>
+      <p>Esta acción no se puede deshacer.</p>
+      <input type="hidden" id="eliminarModeradorUsuario">
+      <div class="popup-actions">
+        <button class="cancel" onclick="cerrarPopup('popupEliminarModerador')">Cancelar</button>
+        <button class="delete" onclick="confirmarEliminarModerador()">Eliminar</button>
       </div>
     </div>
   </div>
@@ -1422,9 +1565,18 @@ if ($isAdmin) {
     const blockedPlazas = <?php echo json_encode($blocked); ?>;
     const isAdmin = <?php echo $isAdmin ? 'true' : 'false'; ?>;
     const role = '<?php echo $role; ?>';
+    const reset_password = <?php echo $reset_password ? 'true' : 'false'; ?>;
     let matriculaPendiente = '';
     let filtroActual = 'todas';
     let autocompleteTimeout = null;
+
+    // Función para asignar eventos de forma segura
+    const asignarEvento = (id, evento, callback) => {
+      const elemento = document.getElementById(id);
+      if (elemento) {
+        elemento.addEventListener(evento, callback);
+      }
+    };
 
     function actualizarReloj() {
       const ahora = new Date();
@@ -1500,7 +1652,7 @@ if ($isAdmin) {
       const ocupadas = Object.keys(coches).length;
       const bloqueadas = Object.keys(blockedPlazas).length;
       document.getElementById('plazas-ocupadas').textContent = ocupadas;
-      document.getElementById('plazas-libres').textContent = 800 - ocupadas - bloqueadas;
+      document.getElementById('plazas-libres').textContent = 900 - ocupadas - bloqueadas;
       document.getElementById('plazas-bloqueadas').textContent = bloqueadas;
     }
 
@@ -1521,6 +1673,42 @@ if ($isAdmin) {
           location.reload();
         } else {
           alert('Error: ' + (data.message || 'Credenciales incorrectas'));
+        }
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        alert('Error de conexión');
+      });
+    }
+
+    function restablecerPassword() {
+      const currentPassword = document.getElementById('currentPassword').value;
+      const newPassword = document.getElementById('newPassword').value;
+      const confirmPassword = document.getElementById('confirmPassword').value;
+
+      if (!currentPassword || !newPassword || !confirmPassword) {
+        alert('Todos los campos son obligatorios');
+        return;
+      }
+
+      if (newPassword !== confirmPassword) {
+        alert('Las contraseñas no coinciden');
+        return;
+      }
+
+      fetch('index.php', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: `action=restablecer_password&current_password=${encodeURIComponent(currentPassword)}&new_password=${encodeURIComponent(newPassword)}&confirm_password=${encodeURIComponent(confirmPassword)}`
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === 'success') {
+          location.reload();
+        } else {
+          alert('Error: ' + (data.message || 'Error al cambiar la contraseña'));
         }
       })
       .catch(error => {
@@ -1568,7 +1756,7 @@ if ($isAdmin) {
       const contenedor = document.getElementById('mapa');
       contenedor.innerHTML = '';
 
-      for (let i = 1; i <= 800; i++) {
+      for (let i = 1; i <= 900; i++) {
         const div = document.createElement('div');
         div.className = 'plaza';
         div.textContent = i.toString().padStart(3, '0');
@@ -1778,8 +1966,8 @@ if ($isAdmin) {
       let plaza = plazaInput.value;
 
       plaza = parseInt(plaza);
-      if (!plaza || plaza < 1 || plaza > 800) {
-        alert('Por favor, introduce un número de plaza válido (1-800)');
+      if (!plaza || plaza < 1 || plaza > 900) {
+        alert('Por favor, introduce un número de plaza válido (1-900)');
         return;
       }
 
@@ -2254,46 +2442,90 @@ if ($isAdmin) {
       });
     }
 
-    // Event listeners
-    document.getElementById('matriculaInput').addEventListener('input', function(e) {
-      clearTimeout(autocompleteTimeout);
-      const query = this.value.toUpperCase().trim();
-      autocompleteTimeout = setTimeout(() => buscarAutocompletado(query), 300);
-    });
+    function eliminarModerador() {
+      const username = document.getElementById('editarModeradorUsuario').value;
+      document.getElementById('moderadorAEliminar').textContent = username;
+      document.getElementById('eliminarModeradorUsuario').value = username;
+      cerrarPopup('popupEditarModerador');
+      mostrarPopup('popupEliminarModerador');
+    }
 
-    document.getElementById('matriculaInput').addEventListener('keypress', function(e) {
-      if (e.key === 'Enter') buscarMatricula();
-    });
+    function confirmarEliminarModerador() {
+      const username = document.getElementById('eliminarModeradorUsuario').value;
 
-    document.getElementById('plazaAparcar').addEventListener('keypress', function(e) {
-      if (e.key === 'Enter') guardarNuevaPlaza();
-    });
+      fetch('index.php', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: `action=eliminar_moderador&username=${encodeURIComponent(username)}`
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === 'success') {
+          alert('Moderador eliminado correctamente');
+          cerrarPopup('popupEliminarModerador');
+          mostrarModeradores(); // Actualizar lista
+        } else {
+          alert('Error: ' + (data.message || 'Error desconocido'));
+        }
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        alert('Error de conexión');
+      });
+    }
 
-    document.getElementById('matriculaEliminar').addEventListener('keypress', function(e) {
-      if (e.key === 'Enter') eliminarCoche();
-    });
-
-    document.getElementById('historialMatricula').addEventListener('keypress', function(e) {
-      if (e.key === 'Enter') filtrarHistorial();
-    });
-
-    document.getElementById('loginUser').addEventListener('keypress', function(e) {
-      if (e.key === 'Enter') login();
-    });
-
-    document.getElementById('loginPass').addEventListener('keypress', function(e) {
-      if (e.key === 'Enter') login();
-    });
-
-    // Cerrar autocompletado al hacer clic fuera
-    document.addEventListener('click', function(e) {
-      if (e.target.id !== 'matriculaInput') {
-        document.getElementById('autocompleteSuggestions').style.display = 'none';
-      }
-    });
-
-    // Inicialización
+    // Inicialización cuando el DOM está cargado
     document.addEventListener('DOMContentLoaded', function() {
+      // Asignar eventos a elementos principales
+      const matriculaInput = document.getElementById('matriculaInput');
+      if (matriculaInput) {
+        matriculaInput.addEventListener('input', function(e) {
+          clearTimeout(autocompleteTimeout);
+          const query = this.value.toUpperCase().trim();
+          autocompleteTimeout = setTimeout(() => buscarAutocompletado(query), 300);
+        });
+
+        matriculaInput.addEventListener('keypress', function(e) {
+          if (e.key === 'Enter') buscarMatricula();
+        });
+      }
+
+      // Asignar eventos a elementos de popups
+      asignarEvento('plazaAparcar', 'keypress', function(e) {
+        if (e.key === 'Enter') guardarNuevaPlaza();
+      });
+
+      asignarEvento('matriculaEliminar', 'keypress', function(e) {
+        if (e.key === 'Enter') eliminarCoche();
+      });
+
+      asignarEvento('historialMatricula', 'keypress', function(e) {
+        if (e.key === 'Enter') filtrarHistorial();
+      });
+
+      asignarEvento('loginUser', 'keypress', function(e) {
+        if (e.key === 'Enter') login();
+      });
+
+      asignarEvento('loginPass', 'keypress', function(e) {
+        if (e.key === 'Enter') login();
+      });
+
+      asignarEvento('currentPassword', 'keypress', function(e) {
+        if (e.key === 'Enter') restablecerPassword();
+      });
+
+      asignarEvento('newPassword', 'keypress', function(e) {
+        if (e.key === 'Enter') restablecerPassword();
+      });
+
+      asignarEvento('confirmPassword', 'keypress', function(e) {
+        if (e.key === 'Enter') restablecerPassword();
+      });
+
+      // Configuración inicial
       crearMapa();
       actualizarReloj();
       setInterval(actualizarReloj, 1000);
@@ -2311,6 +2543,16 @@ if ($isAdmin) {
 
       // Actualizar mapa cada minuto
       setInterval(crearMapa, 60000);
+    });
+
+    // Cerrar autocompletado al hacer clic fuera
+    document.addEventListener('click', function(e) {
+      if (e.target.id !== 'matriculaInput') {
+        const suggestions = document.getElementById('autocompleteSuggestions');
+        if (suggestions) {
+          suggestions.style.display = 'none';
+        }
+      }
     });
   </script>
 </body>
