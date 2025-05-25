@@ -12,6 +12,7 @@ $historyFile = 'historial.json';
 $adminFile = 'admin.json';
 $blockedFile = 'blocked.json';
 $profilesFile = 'profiles.json';
+$matriculasFile = 'matriculas.json';
 
 // Crear archivos si no existen
 if (!file_exists($jsonFile)) {
@@ -22,7 +23,10 @@ if (!file_exists($historyFile)) {
 }
 if (!file_exists($adminFile)) {
     file_put_contents($adminFile, json_encode([
-        'moovecars' => password_hash('DNI/NIE_CON_LETRA_MAYUSCULA_SIN_ESPACIOS', PASSWORD_DEFAULT)
+        'moovecars' => [
+            'password' => password_hash('DNI/NIE_CON_LETRA_MAYUSCULA_SIN_ESPACIOS', PASSWORD_DEFAULT),
+            'role' => 'master'
+        ]
     ], JSON_PRETTY_PRINT));
 }
 if (!file_exists($blockedFile)) {
@@ -30,6 +34,9 @@ if (!file_exists($blockedFile)) {
 }
 if (!file_exists($profilesFile)) {
     file_put_contents($profilesFile, json_encode([]));
+}
+if (!file_exists($matriculasFile)) {
+    file_put_contents($matriculasFile, json_encode([]));
 }
 
 // Manejo de solicitudes AJAX
@@ -43,9 +50,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $admins = json_decode(file_get_contents($adminFile), true);
 
-        if (isset($admins[$username]) && password_verify($password, $admins[$username])) {
+        if (isset($admins[$username]) && password_verify($password, $admins[$username]['password'])) {
             $_SESSION['admin'] = $username;
-            echo json_encode(['status' => 'success']);
+            $_SESSION['role'] = $admins[$username]['role'] ?? 'moderador';
+            echo json_encode(['status' => 'success', 'role' => $_SESSION['role']]);
             exit;
         }
 
@@ -56,6 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Logout
     if (isset($_POST['action']) && $_POST['action'] === 'logout') {
         unset($_SESSION['admin']);
+        unset($_SESSION['role']);
         session_destroy();
         echo json_encode(['status' => 'success']);
         exit;
@@ -100,6 +109,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $coches = json_decode(file_get_contents($jsonFile), true) ?: [];
             $historial = json_decode(file_get_contents($historyFile), true) ?: [];
+            $matriculas = json_decode(file_get_contents($matriculasFile), true) ?: [];
 
             // Registrar entrada en historial
             $historial[] = [
@@ -112,6 +122,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             // Actualizar plaza
             $coches[$matricula] = ['plaza' => $plaza, 'timestamp' => time()];
+
+            // Guardar matrícula en archivo de matrículas si no existe
+            if (!in_array($matricula, $matriculas)) {
+                $matriculas[] = $matricula;
+                file_put_contents($matriculasFile, json_encode($matriculas, JSON_PRETTY_PRINT));
+            }
 
             file_put_contents($jsonFile, json_encode($coches, JSON_PRETTY_PRINT));
             file_put_contents($historyFile, json_encode($historial, JSON_PRETTY_PRINT));
@@ -158,6 +174,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         http_response_code(400);
         echo json_encode(['status' => 'error', 'message' => 'Matrícula inválida']);
+        exit;
+    }
+
+    // Vaciar todas las plazas (solo master)
+    if (isset($_POST['action']) && $_POST['action'] === 'vaciar_plazas' && isset($_SESSION['admin']) && $_SESSION['role'] === 'master') {
+        $coches = json_decode(file_get_contents($jsonFile), true) ?: [];
+        $historial = json_decode(file_get_contents($historyFile), true) ?: [];
+
+        // Registrar salida en historial para todos los coches
+        foreach ($coches as $matricula => $datos) {
+            $historial[] = [
+                'matricula' => $matricula,
+                'plaza' => $datos['plaza'],
+                'accion' => 'salida',
+                'timestamp' => time(),
+                'admin' => $_SESSION['admin']
+            ];
+        }
+
+        file_put_contents($jsonFile, json_encode([], JSON_PRETTY_PRINT));
+        file_put_contents($historyFile, json_encode($historial, JSON_PRETTY_PRINT));
+
+        echo json_encode(['status' => 'success', 'count' => count($coches)]);
+        exit;
+    }
+
+    // Obtener sugerencias de matrículas para autocompletado
+    if (isset($_POST['action']) && $_POST['action'] === 'autocompletar_matriculas') {
+        $query = strtoupper(trim($_POST['query'] ?? ''));
+        $matriculas = json_decode(file_get_contents($matriculasFile), true) ?: [];
+
+        $sugerencias = array_filter($matriculas, function($matricula) use ($query) {
+            return strpos($matricula, $query) === 0;
+        });
+
+        echo json_encode(['status' => 'success', 'sugerencias' => array_values($sugerencias)]);
         exit;
     }
 
@@ -216,6 +268,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $coches = json_decode(file_get_contents($jsonFile), true) ?: [];
 $blocked = json_decode(file_get_contents($blockedFile), true) ?: [];
 $isAdmin = isset($_SESSION['admin']);
+$role = $_SESSION['role'] ?? '';
 
 // Obtener nombre del admin para la bienvenida
 $adminName = '';
@@ -233,7 +286,7 @@ if ($isAdmin) {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Mapa de Parking VTC</title>
+  <title>Plazas de aparcamiento - MooveCars Barcelona</title>
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
   <style>
     :root {
@@ -250,6 +303,8 @@ if ($isAdmin) {
       --old-color: #e74c3c;
       --blocked-color: #e74c3c;
       --clock-color: #2c3e50;
+      --master-color: #9b59b6;
+      --moderator-color: #3498db;
     }
 
     * {
@@ -305,6 +360,7 @@ if ($isAdmin) {
       flex: 1;
       min-width: 100%;
       flex-wrap: wrap;
+      position: relative;
     }
 
     .filter-container {
@@ -371,6 +427,14 @@ if ($isAdmin) {
     }
 
     button.profile:hover {
+      background-color: #8e44ad;
+    }
+
+    button.master {
+      background-color: var(--master-color);
+    }
+
+    button.master:hover {
       background-color: #8e44ad;
     }
 
@@ -715,6 +779,14 @@ if ($isAdmin) {
       border-radius: 8px;
     }
 
+    .admin-bar .role-badge {
+      background-color: <?php echo ($role === 'master') ? 'var(--master-color)' : 'var(--moderator-color)'; ?>;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 0.8em;
+      margin-left: 8px;
+    }
+
     .admin-bar button {
       background-color: var(--delete-color);
       border: none;
@@ -761,6 +833,30 @@ if ($isAdmin) {
 
     .profile-info strong {
       color: var(--primary-color);
+    }
+
+    .autocomplete-suggestions {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: white;
+      border: 1px solid #ddd;
+      border-top: none;
+      border-radius: 0 0 5px 5px;
+      z-index: 1000;
+      max-height: 200px;
+      overflow-y: auto;
+      display: none;
+    }
+
+    .autocomplete-suggestion {
+      padding: 8px 12px;
+      cursor: pointer;
+    }
+
+    .autocomplete-suggestion:hover {
+      background-color: #f5f5f5;
     }
 
     @media (min-width: 481px) {
@@ -875,16 +971,19 @@ if ($isAdmin) {
 <body>
   <?php if ($isAdmin): ?>
   <div class="admin-bar">
-    <span>Modo Admin: <?php echo htmlspecialchars($adminName); ?></span>
+    <span>Modo Admin: Bienvenido <?php echo htmlspecialchars($adminName); ?> <span class="role-badge"><?php echo strtoupper($role); ?></span></span>
     <div>
       <button class="profile" onclick="mostrarPerfil()">Perfil</button>
+      <?php if ($role === 'master'): ?>
+        <button class="master" onclick="mostrarVaciarPlazas()">Vaciar Plazas</button>
+      <?php endif; ?>
       <button onclick="logout()">Cerrar sesión</button>
     </div>
   </div>
   <?php endif; ?>
 
   <div class="container">
-    <h1>Mapa de Parking VTC</h1>
+    <h1>Plazas de aparcamiento - MooveCars Barcelona</h1>
     <div class="clock" id="reloj"></div>
 
     <div class="stats">
@@ -932,6 +1031,7 @@ if ($isAdmin) {
     <div class="controls">
       <div class="search-container">
         <input type="text" id="matriculaInput" placeholder="Introduce la matrícula (ej: 1234ABC)" autocomplete="off" autofocus>
+        <div id="autocompleteSuggestions" class="autocomplete-suggestions"></div>
         <button onclick="buscarMatricula()">Buscar</button>
         <?php if (!$isAdmin): ?>
         <button class="login" onclick="mostrarPopup('loginContainer')">Login</button>
@@ -1044,6 +1144,19 @@ if ($isAdmin) {
     </div>
   </div>
 
+  <div id="popupVaciarPlazas" class="popup">
+    <div class="popup-content">
+      <button class="popup-close" onclick="cerrarPopup('popupVaciarPlazas')">×</button>
+      <h2>Vaciar todas las plazas</h2>
+      <p>¿Estás seguro de que deseas vaciar todas las plazas del parking?</p>
+      <p>Esta acción registrará la salida de todos los vehículos en el historial pero mantendrá las matrículas en el sistema.</p>
+      <div class="popup-actions">
+        <button class="cancel" onclick="cerrarPopup('popupVaciarPlazas')">Cancelar</button>
+        <button class="master" onclick="vaciarTodasLasPlazas()">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
   <div id="loginContainer" class="popup">
     <div class="popup-content">
       <button class="popup-close" onclick="cerrarPopup('loginContainer')">×</button>
@@ -1064,8 +1177,10 @@ if ($isAdmin) {
     const coches = <?php echo json_encode($coches); ?>;
     const blockedPlazas = <?php echo json_encode($blocked); ?>;
     const isAdmin = <?php echo $isAdmin ? 'true' : 'false'; ?>;
+    const role = '<?php echo $role; ?>';
     let matriculaPendiente = '';
     let filtroActual = 'todas';
+    let autocompleteTimeout = null;
 
     function actualizarReloj() {
       const ahora = new Date();
@@ -1510,6 +1625,44 @@ if ($isAdmin) {
       });
     }
 
+    function mostrarVaciarPlazas() {
+      if (role !== 'master') return;
+      mostrarPopup('popupVaciarPlazas');
+    }
+
+    function vaciarTodasLasPlazas() {
+      if (role !== 'master') return;
+
+      if (!confirm('¿Estás seguro de que deseas vaciar TODAS las plazas del parking?')) {
+        return;
+      }
+
+      fetch('parking.php', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: 'action=vaciar_plazas'
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === 'success') {
+          alert(`Se han vaciado ${data.count} plazas correctamente`);
+          for (const matricula in coches) {
+            delete coches[matricula];
+          }
+          crearMapa();
+          cerrarPopup('popupVaciarPlazas');
+        } else {
+          alert('Error al vaciar las plazas');
+        }
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        alert('Error de conexión');
+      });
+    }
+
     function mostrarPerfil() {
       fetch('parking.php', {
         method: 'POST',
@@ -1581,7 +1734,50 @@ if ($isAdmin) {
       });
     }
 
+    function buscarAutocompletado(query) {
+      if (query.length < 2) {
+        document.getElementById('autocompleteSuggestions').style.display = 'none';
+        return;
+      }
+
+      fetch('parking.php', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: `action=autocompletar_matriculas&query=${encodeURIComponent(query)}`
+      })
+      .then(res => res.json())
+      .then(data => {
+        const suggestionsContainer = document.getElementById('autocompleteSuggestions');
+        suggestionsContainer.innerHTML = '';
+
+        if (data.status === 'success' && data.sugerencias.length > 0) {
+          data.sugerencias.forEach(matricula => {
+            const div = document.createElement('div');
+            div.className = 'autocomplete-suggestion';
+            div.textContent = matricula;
+            div.onclick = () => {
+              document.getElementById('matriculaInput').value = matricula;
+              suggestionsContainer.style.display = 'none';
+              buscarMatricula();
+            };
+            suggestionsContainer.appendChild(div);
+          });
+          suggestionsContainer.style.display = 'block';
+        } else {
+          suggestionsContainer.style.display = 'none';
+        }
+      });
+    }
+
     // Event listeners
+    document.getElementById('matriculaInput').addEventListener('input', function(e) {
+      clearTimeout(autocompleteTimeout);
+      const query = this.value.toUpperCase().trim();
+      autocompleteTimeout = setTimeout(() => buscarAutocompletado(query), 300);
+    });
+
     document.getElementById('matriculaInput').addEventListener('keypress', function(e) {
       if (e.key === 'Enter') buscarMatricula();
     });
@@ -1604,6 +1800,13 @@ if ($isAdmin) {
 
     document.getElementById('loginPass').addEventListener('keypress', function(e) {
       if (e.key === 'Enter') login();
+    });
+
+    // Cerrar autocompletado al hacer clic fuera
+    document.addEventListener('click', function(e) {
+      if (e.target.id !== 'matriculaInput') {
+        document.getElementById('autocompleteSuggestions').style.display = 'none';
+      }
     });
 
     // Inicialización
