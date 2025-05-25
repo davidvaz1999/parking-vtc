@@ -82,7 +82,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['action']) && $_POST['action'] === 'toggle_block' && isset($_SESSION['admin'])) {
         $plaza = intval($_POST['plaza'] ?? 0);
 
-        if ($plaza > 0 && $plaza <= 900) {
+        if ($plaza > 0 && $plaza <= 800) {
             $blocked = json_decode(file_get_contents($blockedFile), true) ?: [];
 
             if (isset($blocked[$plaza])) {
@@ -106,7 +106,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $plaza = intval($_POST['plaza'] ?? 0);
 
         // Validación
-        if (preg_match('/^[0-9BCDFGHJKLMNPRSTVWXYZ]{4}[0-9BCDFGHJKLMNPRSTVWXYZ]{3}$/', $matricula) && $plaza > 0 && $plaza <= 900) {
+        if (preg_match('/^[0-9BCDFGHJKLMNPRSTVWXYZ]{4}[0-9BCDFGHJKLMNPRSTVWXYZ]{3}$/', $matricula) && $plaza > 0 && $plaza <= 800) {
             $blocked = json_decode(file_get_contents($blockedFile), true) ?: [];
 
             // Verificar si la plaza está bloqueada
@@ -1150,7 +1150,7 @@ if ($isAdmin) {
     <div class="stats">
       <div class="stat-card">
         <h3>Plazas totales</h3>
-        <p>900</p>
+        <p>800</p>
       </div>
       <div class="stat-card">
         <h3>Plazas ocupadas</h3>
@@ -1158,7 +1158,7 @@ if ($isAdmin) {
       </div>
       <div class="stat-card">
         <h3>Plazas libres</h3>
-        <p id="plazas-libres"><?php echo 900 - count($coches) - count($blocked); ?></p>
+        <p id="plazas-libres"><?php echo 800 - count($coches) - count($blocked); ?></p>
       </div>
       <div class="stat-card">
         <h3>Plazas bloqueadas</h3>
@@ -1246,7 +1246,7 @@ if ($isAdmin) {
       <button class="popup-close" onclick="cerrarPopup('popupAparcar')">×</button>
       <h2>Aparcar vehículo</h2>
       <p>Introduce el número de plaza para la matrícula <strong id="matriculaAparcar"></strong>:</p>
-      <input type="number" id="plazaAparcar" min="1" max="900" placeholder="Número de plaza (1-900)">
+      <input type="number" id="plazaAparcar" min="1" max="800" placeholder="Número de plaza (1-800)">
       <div class="popup-actions">
         <button onclick="guardarNuevaPlaza()">Confirmar</button>
       </div>
@@ -1500,7 +1500,7 @@ if ($isAdmin) {
       const ocupadas = Object.keys(coches).length;
       const bloqueadas = Object.keys(blockedPlazas).length;
       document.getElementById('plazas-ocupadas').textContent = ocupadas;
-      document.getElementById('plazas-libres').textContent = 900 - ocupadas - bloqueadas;
+      document.getElementById('plazas-libres').textContent = 800 - ocupadas - bloqueadas;
       document.getElementById('plazas-bloqueadas').textContent = bloqueadas;
     }
 
@@ -1568,7 +1568,7 @@ if ($isAdmin) {
       const contenedor = document.getElementById('mapa');
       contenedor.innerHTML = '';
 
-      for (let i = 1; i <= 900; i++) {
+      for (let i = 1; i <= 800; i++) {
         const div = document.createElement('div');
         div.className = 'plaza';
         div.textContent = i.toString().padStart(3, '0');
@@ -1778,8 +1778,8 @@ if ($isAdmin) {
       let plaza = plazaInput.value;
 
       plaza = parseInt(plaza);
-      if (!plaza || plaza < 1 || plaza > 900) {
-        alert('Por favor, introduce un número de plaza válido (1-900)');
+      if (!plaza || plaza < 1 || plaza > 800) {
+        alert('Por favor, introduce un número de plaza válido (1-800)');
         return;
       }
 
