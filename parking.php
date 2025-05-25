@@ -2,6 +2,11 @@
 session_start();
 date_default_timezone_set('Europe/Madrid');
 
+// Habilitar visualización de errores
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
 $jsonFile = 'coches.json';
 $historyFile = 'historial.json';
 $adminFile = 'admin.json';
@@ -83,7 +88,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (preg_match('/^[0-9BCDFGHJKLMNPRSTVWXYZ]{4}[0-9BCDFGHJKLMNPRSTVWXYZ]{3}$/', $matricula) && $plaza > 0 && $plaza <= 900) {
             $blocked = json_decode(file_get_contents($blockedFile), true) ?: [];
 
-            // Verificar si la plaza está bloqueada y no es admin
+            // Verificar si la plaza está bloqueada
             if (isset($blocked[$plaza]) && !isset($_SESSION['admin'])) {
                 echo json_encode(['status' => 'error', 'message' => 'Plaza en mantenimiento']);
                 exit;
@@ -200,6 +205,7 @@ $isAdmin = isset($_SESSION['admin']);
       --medium-color: #f1c40f;
       --old-color: #e74c3c;
       --blocked-color: #e74c3c;
+      --clock-color: #2c3e50;
     }
 
     * {
@@ -232,6 +238,14 @@ $isAdmin = isset($_SESSION['admin']);
       text-align: center;
       margin-bottom: 15px;
       font-size: 1.5rem;
+    }
+
+    .clock {
+      text-align: center;
+      font-size: 1.2rem;
+      color: var(--clock-color);
+      margin-bottom: 15px;
+      font-weight: bold;
     }
 
     .controls {
@@ -421,7 +435,6 @@ $isAdmin = isset($_SESSION['admin']);
       100% { transform: scale(1); }
     }
 
-    /* Popups */
     .popup {
       position: fixed;
       top: 0;
@@ -683,6 +696,10 @@ $isAdmin = isset($_SESSION['admin']);
         font-size: 2rem;
       }
 
+      .clock {
+        font-size: 1.5rem;
+      }
+
       #mapa {
         grid-template-columns: repeat(auto-fill, minmax(30px, 1fr));
         gap: 3px;
@@ -786,13 +803,14 @@ $isAdmin = isset($_SESSION['admin']);
 <body>
   <?php if ($isAdmin): ?>
   <div class="admin-bar">
-    <span>Modo Admin: <?php echo $_SESSION['admin']; ?></span>
+    <span>Modo Admin: <?php echo htmlspecialchars($_SESSION['admin']); ?></span>
     <button onclick="logout()">Cerrar sesión</button>
   </div>
   <?php endif; ?>
 
   <div class="container">
     <h1>Mapa de Parking VTC</h1>
+    <div class="clock" id="reloj"></div>
 
     <div class="stats">
       <div class="stat-card">
@@ -801,7 +819,7 @@ $isAdmin = isset($_SESSION['admin']);
       </div>
       <div class="stat-card">
         <h3>Plazas ocupadas</h3>
-        <p id="plazas-ocupadas">0</p>
+        <p id="plazas-ocupadas"><?php echo count($coches); ?></p>
       </div>
       <div class="stat-card">
         <h3>Plazas libres</h3>
@@ -862,7 +880,7 @@ $isAdmin = isset($_SESSION['admin']);
     <div id="mapa"></div>
   </div>
 
-  <!-- Popup para coche encontrado -->
+  <!-- Popups -->
   <div id="popupCocheEncontrado" class="popup">
     <div class="popup-content">
       <button class="popup-close" onclick="cerrarPopup('popupCocheEncontrado')">×</button>
@@ -874,7 +892,6 @@ $isAdmin = isset($_SESSION['admin']);
     </div>
   </div>
 
-  <!-- Popup para coche no encontrado -->
   <div id="popupCocheNoEncontrado" class="popup">
     <div class="popup-content">
       <button class="popup-close" onclick="cerrarPopup('popupCocheNoEncontrado')">×</button>
@@ -888,7 +905,6 @@ $isAdmin = isset($_SESSION['admin']);
     </div>
   </div>
 
-  <!-- Popup para aparcar coche -->
   <div id="popupAparcar" class="popup">
     <div class="popup-content">
       <button class="popup-close" onclick="cerrarPopup('popupAparcar')">×</button>
@@ -901,7 +917,6 @@ $isAdmin = isset($_SESSION['admin']);
     </div>
   </div>
 
-  <!-- Popup para eliminar coche -->
   <div id="popupEliminar" class="popup">
     <div class="popup-content">
       <button class="popup-close" onclick="cerrarPopup('popupEliminar')">×</button>
@@ -914,7 +929,6 @@ $isAdmin = isset($_SESSION['admin']);
     </div>
   </div>
 
-  <!-- Popup para historial -->
   <div id="popupHistorial" class="popup">
     <div class="popup-content">
       <button class="popup-close" onclick="cerrarPopup('popupHistorial')">×</button>
@@ -929,7 +943,6 @@ $isAdmin = isset($_SESSION['admin']);
     </div>
   </div>
 
-  <!-- Login popup -->
   <div id="loginContainer" class="popup">
     <div class="popup-content">
       <button class="popup-close" onclick="cerrarPopup('loginContainer')">×</button>
@@ -942,7 +955,6 @@ $isAdmin = isset($_SESSION['admin']);
     </div>
   </div>
 
-  <!-- Botón de login flotante -->
   <?php if (!$isAdmin): ?>
   <button class="login-button" onclick="mostrarPopup('loginContainer')">🔑</button>
   <?php endif; ?>
@@ -954,20 +966,49 @@ $isAdmin = isset($_SESSION['admin']);
     let matriculaPendiente = '';
     let filtroActual = 'todas';
 
+    function actualizarReloj() {
+      const ahora = new Date();
+      const opciones = {
+        timeZone: 'Europe/Madrid',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      };
+      const horaEspaña = ahora.toLocaleTimeString('es-ES', opciones);
+      const fechaEspaña = ahora.toLocaleDateString('es-ES', {
+        timeZone: 'Europe/Madrid',
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+      document.getElementById('reloj').innerHTML = `${fechaEspaña} - ${horaEspaña}`;
+    }
+
     function formatTime(timestamp) {
       const date = new Date(timestamp * 1000);
-      // Ajustar a hora española (UTC+1 o UTC+2 según horario de verano)
-      const offset = date.getTimezoneOffset() + (date.getTimezoneOffset() > 0 ? 60 : -60);
-      date.setMinutes(date.getMinutes() + offset);
-      return date.toLocaleTimeString('es-ES', {hour: '2-digit', minute:'2-digit'});
+      const opciones = {
+        timeZone: 'Europe/Madrid',
+        hour: '2-digit',
+        minute:'2-digit',
+        hour12: false
+      };
+      return date.toLocaleTimeString('es-ES', opciones);
     }
 
     function formatDate(timestamp) {
       const date = new Date(timestamp * 1000);
-      // Ajustar a hora española
-      const offset = date.getTimezoneOffset() + (date.getTimezoneOffset() > 0 ? 60 : -60);
-      date.setMinutes(date.getMinutes() + offset);
-      return date.toLocaleString('es-ES');
+      const opciones = {
+        timeZone: 'Europe/Madrid',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      };
+      return date.toLocaleString('es-ES', opciones);
     }
 
     function actualizarEstadisticas() {
@@ -1060,14 +1101,8 @@ $isAdmin = isset($_SESSION['admin']);
           const matriculaEnPlaza = Object.entries(coches).find(([_, datos]) => datos.plaza === i);
 
           if (matriculaEnPlaza) {
-            const ahora = new Date();
-            const horaEntrada = new Date(matriculaEnPlaza[1].timestamp * 1000);
-
-            // Ajustar a hora española (UTC+1 o UTC+2 según horario de verano)
-            const offset = ahora.getTimezoneOffset() + (ahora.getTimezoneOffset() > 0 ? 60 : -60);
-            horaEntrada.setMinutes(horaEntrada.getMinutes() + offset);
-
-            const horasOcupacion = (ahora - horaEntrada) / (1000 * 60 * 60);
+            const ahora = Math.floor(Date.now() / 1000);
+            const horasOcupacion = (ahora - matriculaEnPlaza[1].timestamp) / 3600;
 
             if (horasOcupacion < 4) {
               div.classList.add('ocupada', 'reciente');
@@ -1126,7 +1161,6 @@ $isAdmin = isset($_SESSION['admin']);
         return;
       }
 
-      // Validar formato de matrícula
       if (!validarMatricula(input)) {
         alert('Formato de matrícula inválido. Debe ser 1234ABC o 1234-ABC (sin vocales ni Q/Ñ)');
         return;
@@ -1134,17 +1168,14 @@ $isAdmin = isset($_SESSION['admin']);
 
       const matriculaLimpia = input.replace('-', '');
 
-      // Quitar resaltado anterior
       document.querySelectorAll('.plaza').forEach(p => p.classList.remove('resaltada'));
 
       if (coches[matriculaLimpia]) {
-        // Mostrar popup de coche encontrado
         matriculaPendiente = matriculaLimpia;
         document.getElementById('matriculaEncontrada').textContent = matriculaLimpia;
         document.getElementById('plazaEncontrada').textContent = coches[matriculaLimpia].plaza.toString().padStart(3, '0');
         mostrarPopup('popupCocheEncontrado');
 
-        // Resaltar plaza
         const plaza = coches[matriculaLimpia].plaza;
         const div = document.getElementById('plaza-' + plaza);
         if (div) {
@@ -1152,7 +1183,6 @@ $isAdmin = isset($_SESSION['admin']);
           div.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
       } else {
-        // Mostrar popup de coche no encontrado
         matriculaPendiente = matriculaLimpia;
         document.getElementById('matriculaNoEncontrada').textContent = input;
         mostrarPopup('popupCocheNoEncontrado');
@@ -1256,7 +1286,6 @@ $isAdmin = isset($_SESSION['admin']);
         return;
       }
 
-      // Verificar si la plaza está bloqueada
       if (blockedPlazas[plaza] && !isAdmin) {
         alert('Esta plaza está bloqueada para mantenimiento');
         return;
@@ -1343,68 +1372,49 @@ $isAdmin = isset($_SESSION['admin']);
       });
     }
 
-    // Permitir buscar con Enter
+    // Event listeners
     document.getElementById('matriculaInput').addEventListener('keypress', function(e) {
-      if (e.key === 'Enter') {
-        buscarMatricula();
-      }
+      if (e.key === 'Enter') buscarMatricula();
     });
 
     document.getElementById('plazaAparcar').addEventListener('keypress', function(e) {
-      if (e.key === 'Enter') {
-        guardarNuevaPlaza();
-      }
+      if (e.key === 'Enter') guardarNuevaPlaza();
     });
 
     document.getElementById('matriculaEliminar').addEventListener('keypress', function(e) {
-      if (e.key === 'Enter') {
-        eliminarCoche();
-      }
+      if (e.key === 'Enter') eliminarCoche();
     });
 
     document.getElementById('historialMatricula').addEventListener('keypress', function(e) {
-      if (e.key === 'Enter') {
-        filtrarHistorial();
-      }
+      if (e.key === 'Enter') filtrarHistorial();
     });
 
     document.getElementById('loginUser').addEventListener('keypress', function(e) {
-      if (e.key === 'Enter') {
-        login();
-      }
+      if (e.key === 'Enter') login();
     });
 
     document.getElementById('loginPass').addEventListener('keypress', function(e) {
-      if (e.key === 'Enter') {
-        login();
-      }
+      if (e.key === 'Enter') login();
     });
 
-    // Enfoque automático en móviles
-    document.getElementById('matriculaInput').addEventListener('focus', function() {
-      if (window.innerWidth <= 480) {
-        this.scrollIntoView({behavior: 'smooth', block: 'center'});
-      }
-    });
-
-    // Inicializar el mapa
+    // Inicialización
     document.addEventListener('DOMContentLoaded', function() {
       crearMapa();
+      actualizarReloj();
+      setInterval(actualizarReloj, 1000);
 
-      // Configurar placeholder inicial
       if (window.innerWidth <= 480) {
         document.getElementById('matriculaInput').placeholder = "Matrícula";
       }
 
-      // Establecer fechas por defecto en el historial
+      // Fechas por defecto en historial
       const today = new Date();
       const oneWeekAgo = new Date();
       oneWeekAgo.setDate(today.getDate() - 7);
-
       document.getElementById('historialFechaInicio').valueAsDate = oneWeekAgo;
       document.getElementById('historialFechaFin').valueAsDate = today;
 
-      // Actualizar el mapa cada minuto para reflejar cambios de color
+      // Actualizar mapa cada minuto
       setInterval(crearMapa, 60000);
     });
   </script>
