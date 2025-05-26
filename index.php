@@ -2,7 +2,7 @@
 session_start();
 date_default_timezone_set('Europe/Madrid');
 
-// Habilitar visualización de errores
+// Enable error display
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
@@ -14,7 +14,7 @@ $blockedFile = 'blocked.json';
 $profilesFile = 'profiles.json';
 $matriculasFile = 'matriculas.json';
 
-// Crear archivos si no existen
+// Create files if they don't exist
 if (!file_exists($jsonFile)) {
     file_put_contents($jsonFile, json_encode([]));
 }
@@ -43,9 +43,257 @@ if (!file_exists($matriculasFile)) {
     file_put_contents($matriculasFile, json_encode([]));
 }
 
-// Manejo de solicitudes AJAX
+// Language handling
+$availableLanguages = ['es' => 'Español', 'en' => 'English'];
+$defaultLanguage = 'es';
+
+// Translations
+$translations = [
+    'es' => [
+        'title' => 'Plazas de aparcamiento - MooveCars Barcelona',
+        'total_spaces' => 'Plazas totales',
+        'occupied_spaces' => 'Plazas ocupadas',
+        'free_spaces' => 'Plazas libres',
+        'blocked_spaces' => 'Plazas bloqueadas',
+        'recent_occupied' => 'Ocupado (menos de 4h)',
+        'medium_occupied' => 'Ocupado (4-8h)',
+        'old_occupied' => 'Ocupado (más de 8h)',
+        'free' => 'Libre',
+        'blocked' => 'Bloqueada',
+        'plate_placeholder' => 'Introduce la matrícula (ej: 1234ABC)',
+        'search' => 'Buscar',
+        'login' => 'Login',
+        'history' => 'Historial',
+        'all_spaces' => 'Todas las plazas',
+        'occupied' => 'Plazas ocupadas',
+        'free' => 'Plazas libres',
+        'blocked' => 'Plazas bloqueadas',
+        'vehicle_found' => 'Vehículo encontrado',
+        'vehicle_parked_at' => 'El vehículo con matrícula <strong id="matriculaEncontrada"></strong> está estacionado en la plaza <strong id="plazaEncontrada"></strong>.',
+        'remove_from_parking' => 'Sacar del parking',
+        'vehicle_not_found' => 'Vehículo no encontrado',
+        'vehicle_not_found_msg' => 'No se encontró el vehículo con matrícula <strong id="matriculaNoEncontrada"></strong> en el sistema.',
+        'blocked_spaces_info' => 'Los vehículos estacionados en las plazas bloqueadas no están registrados en esta web, ya que son vehículos en reparación o mantenimiento, aunque podrían estar ya listos para circular.',
+        'verify_plate' => 'Verifica que has escrito la matrícula correctamente o acércate a la zona de vehículos bloqueados con la aplicación GeoTab abierta.',
+        'park_vehicle_prompt' => 'Si lo que deseas es aparcar tu vehículo, solo pulsa "Aparcar vehículo".',
+        'incorrect_plate' => 'Matrícula incorrecta',
+        'park_vehicle' => 'Aparcar vehículo',
+        'park_vehicle_title' => 'Aparcar vehículo',
+        'enter_space_number' => 'Introduce el número de plaza para la matrícula <strong id="matriculaAparcar"></strong>:',
+        'space_number_placeholder' => 'Número de plaza (1-900)',
+        'confirm' => 'Confirmar',
+        'remove_car_title' => 'Sacar coche del parking',
+        'enter_plate_to_remove' => 'Introduce la matrícula del coche que vas a sacar:',
+        'plate_placeholder_short' => 'Matrícula (ej: 1234ABC)',
+        'movement_history' => 'Historial de movimientos',
+        'filter_by_plate' => 'Filtrar por matrícula',
+        'search_history' => 'BUSCAR',
+        'admin_profile' => 'Perfil de Administrador',
+        'name' => 'Nombre:',
+        'surname' => 'Apellidos:',
+        'email' => 'Correo electrónico:',
+        'phone' => 'Teléfono móvil:',
+        'cancel' => 'Cancelar',
+        'save' => 'Guardar',
+        'empty_spaces_title' => 'Vaciar todas las plazas',
+        'empty_spaces_confirm' => '¿Estás seguro de que deseas vaciar todas las plazas del parking?',
+        'empty_spaces_warning' => 'Esta acción registrará la salida de todos los vehículos en el historial pero mantendrá las matrículas en el sistema.',
+        'moderator_management' => 'Gestión de Moderadores',
+        'add_moderator' => '➕ Añadir Moderador',
+        'new_moderator_title' => 'Añadir Nuevo Moderador',
+        'username' => 'Usuario:',
+        'password' => 'Contraseña:',
+        'role' => 'Rol:',
+        'moderator' => 'Moderador',
+        'master' => 'Master',
+        'edit_moderator_title' => 'Editar Moderador',
+        'status' => 'Estado:',
+        'active' => 'Activo',
+        'inactive' => 'Inactivo',
+        'change_password' => 'Cambiar Contraseña',
+        'delete_moderator' => 'Eliminar Moderador',
+        'save_changes' => 'Guardar Cambios',
+        'change_password_title' => 'Cambiar Contraseña',
+        'new_password' => 'Nueva Contraseña:',
+        'confirm_password' => 'Confirmar Contraseña:',
+        'delete_moderator_title' => 'Eliminar Moderador',
+        'delete_moderator_confirm' => '¿Estás seguro de que deseas eliminar al moderador <strong id="moderadorAEliminar"></strong>?',
+        'delete_moderator_warning' => 'Esta acción no se puede deshacer.',
+        'admin_access' => 'Acceso Administrador',
+        'user_placeholder' => 'Usuario',
+        'password_placeholder' => 'Contraseña',
+        'enter' => 'Entrar',
+        'reset_password_title' => 'Restablecer contraseña',
+        'reset_password_msg' => 'Es necesario que cambies tu contraseña antes de continuar.',
+        'current_password' => 'Contraseña actual',
+        'new_password_placeholder' => 'Nueva contraseña',
+        'confirm_password_placeholder' => 'Confirmar nueva contraseña',
+        'change_password_button' => 'Cambiar contraseña',
+        'admin_mode' => 'Modo Admin: Bienvenido',
+        'logout' => 'Cerrar sesión',
+        'profile' => 'Perfil',
+        'moderators' => 'Moderadores',
+        'empty_spaces_button' => 'Vaciar Plazas',
+        'no_moderators' => 'No hay moderadores registrados',
+        'never' => 'Nunca',
+        'actions' => 'Acciones',
+        'edit' => 'Editar',
+        'no_records' => 'No hay registros en el historial',
+        'entry' => 'Entrada',
+        'exit' => 'Salida',
+        'space' => 'Plaza',
+        'invalid_plate_format' => 'Formato de matrícula inválido. Debe ser 1234ABC o 1234-ABC (sin vocales ni Q/Ñ)',
+        'invalid_space_number' => 'Por favor, introduce un número de plaza válido (1-900)',
+        'space_blocked' => 'Esta plaza está bloqueada para mantenimiento',
+        'space_already_occupied' => 'La plaza {space} ya está ocupada. ¿Deseas sobrescribirla?',
+        'confirm_remove_car' => '¿Estás seguro de que quieres sacar el coche con matrícula {plate} del parking?',
+        'confirm_empty_spaces' => '¿Estás seguro de que deseas vaciar TODAS las plazas del parking?',
+        'success' => 'Éxito',
+        'error' => 'Error',
+        'connection_error' => 'Error de conexión',
+        'all_fields_required' => 'Todos los campos son obligatorios',
+        'passwords_not_match' => 'Las contraseñas no coinciden',
+        'no_profile_info' => 'No hay información de perfil guardada.',
+        'no_moderator_info' => 'No hay información de perfil disponible',
+        'registered' => 'Registrado',
+        'last_login' => 'Último login',
+        'not_specified' => 'No especificado',
+        'language' => 'Idioma',
+        'please_enter_plate' => 'Por favor, introduce una matrícula'
+    ],
+    'en' => [
+        'title' => 'Parking Spaces - MooveCars Barcelona',
+        'total_spaces' => 'Total spaces',
+        'occupied_spaces' => 'Occupied spaces',
+        'free_spaces' => 'Free spaces',
+        'blocked_spaces' => 'Blocked spaces',
+        'recent_occupied' => 'Occupied (less than 4h)',
+        'medium_occupied' => 'Occupied (4-8h)',
+        'old_occupied' => 'Occupied (more than 8h)',
+        'free' => 'Free',
+        'blocked' => 'Blocked',
+        'plate_placeholder' => 'Enter license plate (e.g. 1234ABC)',
+        'search' => 'Search',
+        'login' => 'Login',
+        'history' => 'History',
+        'all_spaces' => 'All spaces',
+        'occupied' => 'Occupied spaces',
+        'free' => 'Free spaces',
+        'blocked' => 'Blocked spaces',
+        'vehicle_found' => 'Vehicle found',
+        'vehicle_parked_at' => 'The vehicle with license plate <strong id="matriculaEncontrada"></strong> is parked in space <strong id="plazaEncontrada"></strong>.',
+        'remove_from_parking' => 'Remove from parking',
+        'vehicle_not_found' => 'Vehicle not found',
+        'vehicle_not_found_msg' => 'The vehicle with license plate <strong id="matriculaNoEncontrada"></strong> was not found in the system.',
+        'blocked_spaces_info' => 'Vehicles parked in blocked spaces are not registered in this system as they are under repair or maintenance, though they might be ready to drive.',
+        'verify_plate' => 'Please verify you entered the correct license plate or check the blocked vehicles area with the GeoTab app open.',
+        'park_vehicle_prompt' => 'If you want to park your vehicle, just click "Park vehicle".',
+        'incorrect_plate' => 'Incorrect plate',
+        'park_vehicle' => 'Park vehicle',
+        'park_vehicle_title' => 'Park Vehicle',
+        'enter_space_number' => 'Enter the space number for license plate <strong id="matriculaAparcar"></strong>:',
+        'space_number_placeholder' => 'Space number (1-900)',
+        'confirm' => 'Confirm',
+        'remove_car_title' => 'Remove car from parking',
+        'enter_plate_to_remove' => 'Enter the license plate of the car you want to remove:',
+        'plate_placeholder_short' => 'License plate (e.g. 1234ABC)',
+        'movement_history' => 'Movement History',
+        'filter_by_plate' => 'Filter by license plate',
+        'search_history' => 'SEARCH',
+        'admin_profile' => 'Admin Profile',
+        'name' => 'Name:',
+        'surname' => 'Surname:',
+        'email' => 'Email:',
+        'phone' => 'Phone:',
+        'cancel' => 'Cancel',
+        'save' => 'Save',
+        'empty_spaces_title' => 'Empty all spaces',
+        'empty_spaces_confirm' => 'Are you sure you want to empty all parking spaces?',
+        'empty_spaces_warning' => 'This action will register all vehicles as exited in the history but will keep the license plates in the system.',
+        'moderator_management' => 'Moderator Management',
+        'add_moderator' => '➕ Add Moderator',
+        'new_moderator_title' => 'Add New Moderator',
+        'username' => 'Username:',
+        'password' => 'Password:',
+        'role' => 'Role:',
+        'moderator' => 'Moderator',
+        'master' => 'Master',
+        'edit_moderator_title' => 'Edit Moderator',
+        'status' => 'Status:',
+        'active' => 'Active',
+        'inactive' => 'Inactive',
+        'change_password' => 'Change Password',
+        'delete_moderator' => 'Delete Moderator',
+        'save_changes' => 'Save Changes',
+        'change_password_title' => 'Change Password',
+        'new_password' => 'New Password:',
+        'confirm_password' => 'Confirm Password:',
+        'delete_moderator_title' => 'Delete Moderator',
+        'delete_moderator_confirm' => 'Are you sure you want to delete moderator <strong id="moderadorAEliminar"></strong>?',
+        'delete_moderator_warning' => 'This action cannot be undone.',
+        'admin_access' => 'Admin Access',
+        'user_placeholder' => 'Username',
+        'password_placeholder' => 'Password',
+        'enter' => 'Enter',
+        'reset_password_title' => 'Reset Password',
+        'reset_password_msg' => 'You need to change your password before continuing.',
+        'current_password' => 'Current password',
+        'new_password_placeholder' => 'New password',
+        'confirm_password_placeholder' => 'Confirm new password',
+        'change_password_button' => 'Change password',
+        'admin_mode' => 'Admin Mode: Welcome',
+        'logout' => 'Logout',
+        'profile' => 'Profile',
+        'moderators' => 'Moderators',
+        'empty_spaces_button' => 'Empty Spaces',
+        'no_moderators' => 'No moderators registered',
+        'never' => 'Never',
+        'actions' => 'Actions',
+        'edit' => 'Edit',
+        'no_records' => 'No records in history',
+        'entry' => 'Entry',
+        'exit' => 'Exit',
+        'space' => 'Space',
+        'invalid_plate_format' => 'Invalid license plate format. Must be 1234ABC or 1234-ABC (no vowels or Q/Ñ)',
+        'invalid_space_number' => 'Please enter a valid space number (1-900)',
+        'space_blocked' => 'This space is blocked for maintenance',
+        'space_already_occupied' => 'Space {space} is already occupied. Do you want to overwrite it?',
+        'confirm_remove_car' => 'Are you sure you want to remove the car with license plate {plate} from parking?',
+        'confirm_empty_spaces' => 'Are you sure you want to empty ALL parking spaces?',
+        'success' => 'Success',
+        'error' => 'Error',
+        'connection_error' => 'Connection error',
+        'all_fields_required' => 'All fields are required',
+        'passwords_not_match' => 'Passwords do not match',
+        'no_profile_info' => 'No profile information saved.',
+        'no_moderator_info' => 'No moderator information available',
+        'registered' => 'Registered',
+        'last_login' => 'Last login',
+        'not_specified' => 'Not specified',
+        'language' => 'Language',
+        'please_enter_plate' => 'Please enter a license plate'
+    ]
+];
+
+function t($key) {
+    global $translations, $currentLanguage;
+    return $translations[$currentLanguage][$key] ?? $translations['es'][$key] ?? $key;
+}
+
+// Handle AJAX requests
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Content-Type: application/json');
+
+    // Change language
+    if (isset($_POST['action']) && $_POST['action'] === 'change_language') {
+        if (isset($_POST['language']) && array_key_exists($_POST['language'], $availableLanguages)) {
+            $_SESSION['language'] = $_POST['language'];
+            echo json_encode(['status' => 'success']);
+        } else {
+            echo json_encode(['status' => 'error', 'message' => 'Invalid language']);
+        }
+        exit;
+    }
 
     // Login de usuarios
     if (isset($_POST['action']) && $_POST['action'] === 'login') {
@@ -463,13 +711,16 @@ if ($isAdmin) {
         $adminName = $_SESSION['admin'];
     }
 }
+
+// Set current language
+$currentLanguage = $_SESSION['language'] ?? $defaultLanguage;
 ?>
 <!DOCTYPE html>
-<html lang="es">
+<html lang="<?php echo $currentLanguage; ?>">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Plazas de aparcamiento - MooveCars Barcelona</title>
+  <title><?php echo t('title'); ?></title>
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
   <style>
     :root {
@@ -1245,49 +1496,49 @@ if ($isAdmin) {
   <?php if ($isAdmin && $reset_password): ?>
   <div class="reset-password-popup">
     <div class="reset-password-box">
-      <h2>Restablecer contraseña</h2>
-      <p>Es necesario que cambies tu contraseña antes de continuar.</p>
-      <input type="password" id="currentPassword" placeholder="Contraseña actual" autocomplete="current-password">
-      <input type="password" id="newPassword" placeholder="Nueva contraseña" autocomplete="new-password">
-      <input type="password" id="confirmPassword" placeholder="Confirmar nueva contraseña" autocomplete="new-password">
-      <button onclick="restablecerPassword()">Cambiar contraseña</button>
+      <h2><?php echo t('reset_password_title'); ?></h2>
+      <p><?php echo t('reset_password_msg'); ?></p>
+      <input type="password" id="currentPassword" placeholder="<?php echo t('current_password'); ?>" autocomplete="current-password">
+      <input type="password" id="newPassword" placeholder="<?php echo t('new_password_placeholder'); ?>" autocomplete="new-password">
+      <input type="password" id="confirmPassword" placeholder="<?php echo t('confirm_password_placeholder'); ?>" autocomplete="new-password">
+      <button onclick="restablecerPassword()"><?php echo t('change_password_button'); ?></button>
     </div>
   </div>
   <?php endif; ?>
 
   <?php if ($isAdmin && !$reset_password): ?>
   <div class="admin-bar">
-    <span>Modo Admin: Bienvenido <?php echo htmlspecialchars($adminName); ?> <span class="role-badge"><?php echo strtoupper($role); ?></span></span>
+    <span><?php echo t('admin_mode'); ?> <?php echo htmlspecialchars($adminName); ?> <span class="role-badge"><?php echo strtoupper($role); ?></span></span>
     <div>
-      <button class="profile" onclick="mostrarPerfil()">Perfil</button>
+      <button class="profile" onclick="mostrarPerfil()"><?php echo t('profile'); ?></button>
       <?php if ($role === 'master'): ?>
-        <button onclick="mostrarModeradores()">Moderadores</button>
-        <button class="master" onclick="mostrarVaciarPlazas()">Vaciar Plazas</button>
+        <button onclick="mostrarModeradores()"><?php echo t('moderators'); ?></button>
+        <button class="master" onclick="mostrarVaciarPlazas()"><?php echo t('empty_spaces_button'); ?></button>
       <?php endif; ?>
-      <button onclick="logout()">Cerrar sesión</button>
+      <button onclick="logout()"><?php echo t('logout'); ?></button>
     </div>
   </div>
   <?php endif; ?>
 
   <div class="container">
-    <h1>Plazas de aparcamiento - MooveCars Barcelona</h1>
+    <h1><?php echo t('title'); ?></h1>
     <div class="clock" id="reloj"></div>
 
     <div class="stats">
       <div class="stat-card">
-        <h3>Plazas totales</h3>
+        <h3><?php echo t('total_spaces'); ?></h3>
         <p>900</p>
       </div>
       <div class="stat-card">
-        <h3>Plazas ocupadas</h3>
+        <h3><?php echo t('occupied_spaces'); ?></h3>
         <p id="plazas-ocupadas"><?php echo count($coches); ?></p>
       </div>
       <div class="stat-card">
-        <h3>Plazas libres</h3>
+        <h3><?php echo t('free_spaces'); ?></h3>
         <p id="plazas-libres"><?php echo 900 - count($coches) - count($blocked); ?></p>
       </div>
       <div class="stat-card">
-        <h3>Plazas bloqueadas</h3>
+        <h3><?php echo t('blocked_spaces'); ?></h3>
         <p id="plazas-bloqueadas"><?php echo count($blocked); ?></p>
       </div>
     </div>
@@ -1295,45 +1546,45 @@ if ($isAdmin) {
     <div class="legend">
       <div class="legend-item">
         <div class="legend-color" style="background-color: var(--recent-color);"></div>
-        <span>Ocupado (menos de 4h)</span>
+        <span><?php echo t('recent_occupied'); ?></span>
       </div>
       <div class="legend-item">
         <div class="legend-color" style="background-color: var(--medium-color);"></div>
-        <span>Ocupado (4-8h)</span>
+        <span><?php echo t('medium_occupied'); ?></span>
       </div>
       <div class="legend-item">
         <div class="legend-color" style="background-color: var(--old-color);"></div>
-        <span>Ocupado (más de 8h)</span>
+        <span><?php echo t('old_occupied'); ?></span>
       </div>
       <div class="legend-item">
         <div class="legend-color" style="background-color: var(--light-color);"></div>
-        <span>Libre</span>
+        <span><?php echo t('free'); ?></span>
       </div>
       <div class="legend-item">
         <div class="legend-color blocked"></div>
-        <span>Bloqueada</span>
+        <span><?php echo t('blocked'); ?></span>
       </div>
     </div>
 
     <div class="controls">
       <div class="search-container">
-        <input type="text" id="matriculaInput" placeholder="Introduce la matrícula (ej: 1234ABC)" autocomplete="off" autofocus>
+        <input type="text" id="matriculaInput" placeholder="<?php echo t('plate_placeholder'); ?>" autocomplete="off" autofocus>
         <div id="autocompleteSuggestions" class="autocomplete-suggestions"></div>
-        <button onclick="buscarMatricula()">Buscar</button>
+        <button onclick="buscarMatricula()"><?php echo t('search'); ?></button>
         <?php if (!$isAdmin): ?>
-        <button class="login" onclick="mostrarPopup('loginContainer')">Login</button>
+        <button class="login" onclick="mostrarPopup('loginContainer')"><?php echo t('login'); ?></button>
         <?php else: ?>
-        <button class="history" onclick="mostrarHistorial()">Historial</button>
+        <button class="history" onclick="mostrarHistorial()"><?php echo t('history'); ?></button>
         <?php endif; ?>
       </div>
 
       <div class="filter-container">
         <select id="filtroEstado" onchange="filtrarPlazas()">
-          <option value="todas">Todas las plazas</option>
-          <option value="ocupadas">Plazas ocupadas</option>
-          <option value="libres">Plazas libres</option>
+          <option value="todas"><?php echo t('all_spaces'); ?></option>
+          <option value="ocupadas"><?php echo t('occupied'); ?></option>
+          <option value="libres"><?php echo t('free'); ?></option>
           <?php if ($isAdmin): ?>
-          <option value="bloqueadas">Plazas bloqueadas</option>
+          <option value="bloqueadas"><?php echo t('blocked'); ?></option>
           <?php endif; ?>
         </select>
       </div>
@@ -1346,10 +1597,10 @@ if ($isAdmin) {
   <div id="popupCocheEncontrado" class="popup">
     <div class="popup-content">
       <button class="popup-close" onclick="cerrarPopup('popupCocheEncontrado')">×</button>
-      <h2>Vehículo encontrado</h2>
-      <p>El vehículo con matrícula <strong id="matriculaEncontrada"></strong> está estacionado en la plaza <strong id="plazaEncontrada"></strong>.</p>
+      <h2><?php echo t('vehicle_found'); ?></h2>
+      <p><?php echo t('vehicle_parked_at'); ?></p>
       <div class="popup-actions">
-        <button class="delete" onclick="confirmarSacarCoche()">Sacar del parking</button>
+        <button class="delete" onclick="confirmarSacarCoche()"><?php echo t('remove_from_parking'); ?></button>
       </div>
     </div>
   </div>
@@ -1357,14 +1608,14 @@ if ($isAdmin) {
   <div id="popupCocheNoEncontrado" class="popup">
     <div class="popup-content">
       <button class="popup-close" onclick="cerrarPopup('popupCocheNoEncontrado')">×</button>
-      <h2>Vehículo no encontrado</h2>
-      <p>No se encontró el vehículo con matrícula <strong id="matriculaNoEncontrada"></strong> en el sistema.</p>
-      <p>Los vehículos estacionados en las plazas bloqueadas no están registrados en esta web, ya que son vehículos en reparación o mantenimiento, aunque podrían estar ya listos para circular.</p>
-      <p>Verifica que has escrito la matrícula correctamente o acércate a la zona de vehículos bloqueados con la aplicación GeoTab abierta.</p>
-      <p>Si lo que deseas es aparcar tu vehículo, solo pulsa "Aparcar vehículo".</p>
+      <h2><?php echo t('vehicle_not_found'); ?></h2>
+      <p><?php echo t('vehicle_not_found_msg'); ?></p>
+      <p><?php echo t('blocked_spaces_info'); ?></p>
+      <p><?php echo t('verify_plate'); ?></p>
+      <p><?php echo t('park_vehicle_prompt'); ?></p>
       <div class="popup-actions popup-actions-column">
-        <button onclick="volverAIntroducirMatricula()">Matrícula incorrecta</button>
-        <button onclick="mostrarPopupAparcar()">Aparcar vehículo</button>
+        <button onclick="volverAIntroducirMatricula()"><?php echo t('incorrect_plate'); ?></button>
+        <button onclick="mostrarPopupAparcar()"><?php echo t('park_vehicle'); ?></button>
       </div>
     </div>
   </div>
@@ -1372,11 +1623,11 @@ if ($isAdmin) {
   <div id="popupAparcar" class="popup">
     <div class="popup-content">
       <button class="popup-close" onclick="cerrarPopup('popupAparcar')">×</button>
-      <h2>Aparcar vehículo</h2>
-      <p>Introduce el número de plaza para la matrícula <strong id="matriculaAparcar"></strong>:</p>
-      <input type="number" id="plazaAparcar" min="1" max="900" placeholder="Número de plaza (1-900)">
+      <h2><?php echo t('park_vehicle_title'); ?></h2>
+      <p><?php echo t('enter_space_number'); ?></p>
+      <input type="number" id="plazaAparcar" min="1" max="900" placeholder="<?php echo t('space_number_placeholder'); ?>">
       <div class="popup-actions">
-        <button onclick="guardarNuevaPlaza()">Confirmar</button>
+        <button onclick="guardarNuevaPlaza()"><?php echo t('confirm'); ?></button>
       </div>
     </div>
   </div>
@@ -1384,11 +1635,11 @@ if ($isAdmin) {
   <div id="popupEliminar" class="popup">
     <div class="popup-content">
       <button class="popup-close" onclick="cerrarPopup('popupEliminar')">×</button>
-      <h2>Sacar coche del parking</h2>
-      <p>Introduce la matrícula del coche que vas a sacar:</p>
-      <input type="text" id="matriculaEliminar" placeholder="Matrícula (ej: 1234ABC)">
+      <h2><?php echo t('remove_car_title'); ?></h2>
+      <p><?php echo t('enter_plate_to_remove'); ?></p>
+      <input type="text" id="matriculaEliminar" placeholder="<?php echo t('plate_placeholder_short'); ?>">
       <div class="popup-actions">
-        <button class="delete" onclick="eliminarCoche()">Confirmar</button>
+        <button class="delete" onclick="eliminarCoche()"><?php echo t('confirm'); ?></button>
       </div>
     </div>
   </div>
@@ -1396,12 +1647,12 @@ if ($isAdmin) {
   <div id="popupHistorial" class="popup">
     <div class="popup-content">
       <button class="popup-close" onclick="cerrarPopup('popupHistorial')">×</button>
-      <h2>Historial de movimientos</h2>
+      <h2><?php echo t('movement_history'); ?></h2>
       <div class="filter-container" style="margin-bottom: 15px;">
-        <input type="text" id="historialMatricula" placeholder="Filtrar por matrícula">
+        <input type="text" id="historialMatricula" placeholder="<?php echo t('filter_by_plate'); ?>">
         <input type="date" id="historialFechaInicio">
         <input type="date" id="historialFechaFin">
-        <button onclick="filtrarHistorial()">BUSCAR</button>
+        <button onclick="filtrarHistorial()"><?php echo t('search_history'); ?></button>
       </div>
       <div id="historialContenido"></div>
     </div>
@@ -1410,24 +1661,24 @@ if ($isAdmin) {
   <div id="popupPerfil" class="popup">
     <div class="popup-content">
       <button class="popup-close" onclick="cerrarPopup('popupPerfil')">×</button>
-      <h2>Perfil de Administrador</h2>
+      <h2><?php echo t('admin_profile'); ?></h2>
       <div id="perfilInfo" class="profile-info"></div>
       <form id="formPerfil">
-        <label for="perfilNombre">Nombre:</label>
-        <input type="text" id="perfilNombre" placeholder="Nombre">
+        <label for="perfilNombre"><?php echo t('name'); ?></label>
+        <input type="text" id="perfilNombre" placeholder="<?php echo t('name'); ?>">
 
-        <label for="perfilApellidos">Apellidos:</label>
-        <input type="text" id="perfilApellidos" placeholder="Apellidos">
+        <label for="perfilApellidos"><?php echo t('surname'); ?></label>
+        <input type="text" id="perfilApellidos" placeholder="<?php echo t('surname'); ?>">
 
-        <label for="perfilEmail">Correo electrónico:</label>
-        <input type="email" id="perfilEmail" placeholder="Correo electrónico">
+        <label for="perfilEmail"><?php echo t('email'); ?></label>
+        <input type="email" id="perfilEmail" placeholder="<?php echo t('email'); ?>">
 
-        <label for="perfilTelefono">Teléfono móvil:</label>
-        <input type="tel" id="perfilTelefono" placeholder="Teléfono móvil">
+        <label for="perfilTelefono"><?php echo t('phone'); ?></label>
+        <input type="tel" id="perfilTelefono" placeholder="<?php echo t('phone'); ?>">
 
         <div class="popup-actions">
-          <button type="button" class="cancel" onclick="cerrarPopup('popupPerfil')">Cancelar</button>
-          <button type="button" onclick="guardarPerfil()">Guardar</button>
+          <button type="button" class="cancel" onclick="cerrarPopup('popupPerfil')"><?php echo t('cancel'); ?></button>
+          <button type="button" onclick="guardarPerfil()"><?php echo t('save'); ?></button>
         </div>
       </form>
     </div>
@@ -1436,12 +1687,12 @@ if ($isAdmin) {
   <div id="popupVaciarPlazas" class="popup">
     <div class="popup-content">
       <button class="popup-close" onclick="cerrarPopup('popupVaciarPlazas')">×</button>
-      <h2>Vaciar todas las plazas</h2>
-      <p>¿Estás seguro de que deseas vaciar todas las plazas del parking?</p>
-      <p>Esta acción registrará la salida de todos los vehículos en el historial pero mantendrá las matrículas en el sistema.</p>
+      <h2><?php echo t('empty_spaces_title'); ?></h2>
+      <p><?php echo t('empty_spaces_confirm'); ?></p>
+      <p><?php echo t('empty_spaces_warning'); ?></p>
       <div class="popup-actions">
-        <button class="cancel" onclick="cerrarPopup('popupVaciarPlazas')">Cancelar</button>
-        <button class="master" onclick="vaciarTodasLasPlazas()">Confirmar</button>
+        <button class="cancel" onclick="cerrarPopup('popupVaciarPlazas')"><?php echo t('cancel'); ?></button>
+        <button class="master" onclick="vaciarTodasLasPlazas()"><?php echo t('confirm'); ?></button>
       </div>
     </div>
   </div>
@@ -1449,10 +1700,10 @@ if ($isAdmin) {
   <div id="popupModeradores" class="popup">
     <div class="popup-content">
       <button class="popup-close" onclick="cerrarPopup('popupModeradores')">×</button>
-      <h2>Gestión de Moderadores</h2>
+      <h2><?php echo t('moderator_management'); ?></h2>
 
       <div class="controls" style="margin-bottom: 15px;">
-        <button onclick="mostrarAgregarModerador()">➕ Añadir Moderador</button>
+        <button onclick="mostrarAgregarModerador()"><?php echo t('add_moderator'); ?></button>
       </div>
 
       <div id="listaModeradores"></div>
@@ -1462,23 +1713,23 @@ if ($isAdmin) {
   <div id="popupAgregarModerador" class="popup">
     <div class="popup-content">
       <button class="popup-close" onclick="cerrarPopup('popupAgregarModerador')">×</button>
-      <h2>Añadir Nuevo Moderador</h2>
+      <h2><?php echo t('new_moderator_title'); ?></h2>
 
-      <label for="nuevoModeradorUsuario">Usuario:</label>
-      <input type="text" id="nuevoModeradorUsuario" placeholder="Nombre de usuario">
+      <label for="nuevoModeradorUsuario"><?php echo t('username'); ?></label>
+      <input type="text" id="nuevoModeradorUsuario" placeholder="<?php echo t('username'); ?>">
 
-      <label for="nuevoModeradorPassword">Contraseña:</label>
-      <input type="password" id="nuevoModeradorPassword" placeholder="Contraseña">
+      <label for="nuevoModeradorPassword"><?php echo t('password'); ?></label>
+      <input type="password" id="nuevoModeradorPassword" placeholder="<?php echo t('password'); ?>">
 
-      <label for="nuevoModeradorRol">Rol:</label>
+      <label for="nuevoModeradorRol"><?php echo t('role'); ?></label>
       <select id="nuevoModeradorRol">
-        <option value="moderador">Moderador</option>
-        <option value="master">Master</option>
+        <option value="moderador"><?php echo t('moderator'); ?></option>
+        <option value="master"><?php echo t('master'); ?></option>
       </select>
 
       <div class="popup-actions">
-        <button class="cancel" onclick="cerrarPopup('popupAgregarModerador')">Cancelar</button>
-        <button onclick="agregarModerador()">Guardar</button>
+        <button class="cancel" onclick="cerrarPopup('popupAgregarModerador')"><?php echo t('cancel'); ?></button>
+        <button onclick="agregarModerador()"><?php echo t('save'); ?></button>
       </div>
     </div>
   </div>
@@ -1486,27 +1737,27 @@ if ($isAdmin) {
   <div id="popupEditarModerador" class="popup">
     <div class="popup-content">
       <button class="popup-close" onclick="cerrarPopup('popupEditarModerador')">×</button>
-      <h2>Editar Moderador</h2>
+      <h2><?php echo t('edit_moderator_title'); ?></h2>
       <input type="hidden" id="editarModeradorUsuario">
 
       <div id="moderadorInfo" class="profile-info"></div>
 
-      <label for="editarModeradorRol">Rol:</label>
+      <label for="editarModeradorRol"><?php echo t('role'); ?></label>
       <select id="editarModeradorRol">
-        <option value="moderador">Moderador</option>
-        <option value="master">Master</option>
+        <option value="moderador"><?php echo t('moderator'); ?></option>
+        <option value="master"><?php echo t('master'); ?></option>
       </select>
 
-      <label for="editarModeradorActivo">Estado:</label>
+      <label for="editarModeradorActivo"><?php echo t('status'); ?></label>
       <select id="editarModeradorActivo">
-        <option value="1">Activo</option>
-        <option value="0">Inactivo</option>
+        <option value="1"><?php echo t('active'); ?></option>
+        <option value="0"><?php echo t('inactive'); ?></option>
       </select>
 
       <div class="popup-actions">
-        <button onclick="mostrarCambiarPassword()">Cambiar Contraseña</button>
-        <button class="delete" onclick="eliminarModerador()">Eliminar Moderador</button>
-        <button onclick="actualizarModerador()">Guardar Cambios</button>
+        <button onclick="mostrarCambiarPassword()"><?php echo t('change_password'); ?></button>
+        <button class="delete" onclick="eliminarModerador()"><?php echo t('delete_moderator'); ?></button>
+        <button onclick="actualizarModerador()"><?php echo t('save_changes'); ?></button>
       </div>
     </div>
   </div>
@@ -1514,18 +1765,18 @@ if ($isAdmin) {
   <div id="popupCambiarPassword" class="popup">
     <div class="popup-content">
       <button class="popup-close" onclick="cerrarPopup('popupCambiarPassword')">×</button>
-      <h2>Cambiar Contraseña</h2>
+      <h2><?php echo t('change_password_title'); ?></h2>
       <input type="hidden" id="cambiarPasswordUsuario">
 
-      <label for="nuevaPassword">Nueva Contraseña:</label>
-      <input type="password" id="nuevaPassword" placeholder="Nueva contraseña">
+      <label for="nuevaPassword"><?php echo t('new_password'); ?></label>
+      <input type="password" id="nuevaPassword" placeholder="<?php echo t('new_password'); ?>">
 
-      <label for="confirmarPassword">Confirmar Contraseña:</label>
-      <input type="password" id="confirmarPassword" placeholder="Confirmar contraseña">
+      <label for="confirmarPassword"><?php echo t('confirm_password'); ?></label>
+      <input type="password" id="confirmarPassword" placeholder="<?php echo t('confirm_password'); ?>">
 
       <div class="popup-actions">
-        <button class="cancel" onclick="cerrarPopup('popupCambiarPassword')">Cancelar</button>
-        <button onclick="cambiarPasswordModerador()">Guardar</button>
+        <button class="cancel" onclick="cerrarPopup('popupCambiarPassword')"><?php echo t('cancel'); ?></button>
+        <button onclick="cambiarPasswordModerador()"><?php echo t('save'); ?></button>
       </div>
     </div>
   </div>
@@ -1533,13 +1784,13 @@ if ($isAdmin) {
   <div id="popupEliminarModerador" class="popup">
     <div class="popup-content">
       <button class="popup-close" onclick="cerrarPopup('popupEliminarModerador')">×</button>
-      <h2>Eliminar Moderador</h2>
-      <p>¿Estás seguro de que deseas eliminar al moderador <strong id="moderadorAEliminar"></strong>?</p>
-      <p>Esta acción no se puede deshacer.</p>
+      <h2><?php echo t('delete_moderator_title'); ?></h2>
+      <p><?php echo t('delete_moderator_confirm'); ?></p>
+      <p><?php echo t('delete_moderator_warning'); ?></p>
       <input type="hidden" id="eliminarModeradorUsuario">
       <div class="popup-actions">
-        <button class="cancel" onclick="cerrarPopup('popupEliminarModerador')">Cancelar</button>
-        <button class="delete" onclick="confirmarEliminarModerador()">Eliminar</button>
+        <button class="cancel" onclick="cerrarPopup('popupEliminarModerador')"><?php echo t('cancel'); ?></button>
+        <button class="delete" onclick="confirmarEliminarModerador()"><?php echo t('delete_moderator'); ?></button>
       </div>
     </div>
   </div>
@@ -1547,11 +1798,11 @@ if ($isAdmin) {
   <div id="loginContainer" class="popup">
     <div class="popup-content">
       <button class="popup-close" onclick="cerrarPopup('loginContainer')">×</button>
-      <h2>Acceso Administrador</h2>
-      <input type="text" id="loginUser" placeholder="Usuario" autocomplete="username">
-      <input type="password" id="loginPass" placeholder="Contraseña" autocomplete="current-password">
+      <h2><?php echo t('admin_access'); ?></h2>
+      <input type="text" id="loginUser" placeholder="<?php echo t('user_placeholder'); ?>" autocomplete="username">
+      <input type="password" id="loginPass" placeholder="<?php echo t('password_placeholder'); ?>" autocomplete="current-password">
       <div class="popup-actions">
-        <button onclick="login()">Entrar</button>
+        <button onclick="login()"><?php echo t('enter'); ?></button>
       </div>
     </div>
   </div>
@@ -1559,6 +1810,16 @@ if ($isAdmin) {
   <?php if (!$isAdmin): ?>
   <button class="login-button" onclick="mostrarPopup('loginContainer')">🔑</button>
   <?php endif; ?>
+
+  <div class="language-switcher" style="position: fixed; top: 10px; right: 10px; z-index: 1000;">
+    <select id="languageSelect" onchange="changeLanguage(this.value)" style="padding: 5px; border-radius: 4px;">
+      <?php foreach ($availableLanguages as $code => $name): ?>
+        <option value="<?php echo $code; ?>" <?php echo $currentLanguage === $code ? 'selected' : ''; ?>>
+          <?php echo $name; ?>
+        </option>
+      <?php endforeach; ?>
+    </select>
+  </div>
 
   <script>
     const coches = <?php echo json_encode($coches); ?>;
@@ -1578,6 +1839,22 @@ if ($isAdmin) {
       }
     };
 
+    function changeLanguage(lang) {
+      fetch('index.php', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: `action=change_language&language=${lang}`
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === 'success') {
+          location.reload();
+        }
+      });
+    }
+
     function actualizarReloj() {
       const ahora = new Date();
       const opciones = {
@@ -1587,8 +1864,8 @@ if ($isAdmin) {
         second: '2-digit',
         hour12: false
       };
-      const horaEspaña = ahora.toLocaleTimeString('es-ES', opciones);
-      const fechaEspaña = ahora.toLocaleDateString('es-ES', {
+      const horaEspaña = ahora.toLocaleTimeString('<?php echo $currentLanguage; ?>', opciones);
+      const fechaEspaña = ahora.toLocaleDateString('<?php echo $currentLanguage; ?>', {
         timeZone: 'Europe/Madrid',
         weekday: 'long',
         year: 'numeric',
@@ -1606,7 +1883,7 @@ if ($isAdmin) {
         minute:'2-digit',
         hour12: false
       };
-      return date.toLocaleTimeString('es-ES', opciones);
+      return date.toLocaleTimeString('<?php echo $currentLanguage; ?>', opciones);
     }
 
     function formatDate(timestamp) {
@@ -1620,7 +1897,7 @@ if ($isAdmin) {
         minute: '2-digit',
         hour12: false
       };
-      return date.toLocaleString('es-ES', opciones);
+      return date.toLocaleString('<?php echo $currentLanguage; ?>', opciones);
     }
 
     function formatDuration(timestamp) {
@@ -1628,12 +1905,12 @@ if ($isAdmin) {
       const segundos = ahora - timestamp;
 
       if (segundos < 60) {
-        return `${segundos} segundos`;
+        return `${segundos} <?php echo t('seconds'); ?>`;
       }
 
       const minutos = Math.floor(segundos / 60);
       if (minutos < 60) {
-        return `${minutos} minutos`;
+        return `${minutos} <?php echo t('minutes'); ?>`;
       }
 
       const horas = Math.floor(minutos / 60);
@@ -1672,12 +1949,12 @@ if ($isAdmin) {
         if (data.status === 'success') {
           location.reload();
         } else {
-          alert('Error: ' + (data.message || 'Credenciales incorrectas'));
+          alert('<?php echo t('error'); ?>: ' + (data.message || '<?php echo t('incorrect_credentials'); ?>'));
         }
       })
       .catch(error => {
-        console.error('Error:', error);
-        alert('Error de conexión');
+        console.error('<?php echo t('error'); ?>:', error);
+        alert('<?php echo t('connection_error'); ?>');
       });
     }
 
@@ -1687,12 +1964,12 @@ if ($isAdmin) {
       const confirmPassword = document.getElementById('confirmPassword').value;
 
       if (!currentPassword || !newPassword || !confirmPassword) {
-        alert('Todos los campos son obligatorios');
+        alert('<?php echo t('all_fields_required'); ?>');
         return;
       }
 
       if (newPassword !== confirmPassword) {
-        alert('Las contraseñas no coinciden');
+        alert('<?php echo t('passwords_not_match'); ?>');
         return;
       }
 
@@ -1708,12 +1985,12 @@ if ($isAdmin) {
         if (data.status === 'success') {
           location.reload();
         } else {
-          alert('Error: ' + (data.message || 'Error al cambiar la contraseña'));
+          alert('<?php echo t('error'); ?>: ' + (data.message || '<?php echo t('error_changing_password'); ?>'));
         }
       })
       .catch(error => {
-        console.error('Error:', error);
-        alert('Error de conexión');
+        console.error('<?php echo t('error'); ?>:', error);
+        alert('<?php echo t('connection_error'); ?>');
       });
     }
 
@@ -1842,12 +2119,12 @@ if ($isAdmin) {
     function buscarMatricula() {
       const input = document.getElementById('matriculaInput').value.toUpperCase().trim();
       if (!input) {
-        alert('Por favor, introduce una matrícula');
+        alert('<?php echo t('please_enter_plate'); ?>');
         return;
       }
 
       if (!validarMatricula(input)) {
-        alert('Formato de matrícula inválido. Debe ser 1234ABC o 1234-ABC (sin vocales ni Q/Ñ)');
+        alert('<?php echo t('invalid_plate_format'); ?>');
         return;
       }
 
@@ -1918,12 +2195,12 @@ if ($isAdmin) {
         if (data.status === 'success') {
           mostrarHistorialContenido(data.data);
         } else {
-          document.getElementById('historialContenido').innerHTML = '<p>Error al cargar el historial</p>';
+          document.getElementById('historialContenido').innerHTML = '<p><?php echo t('error_loading_history'); ?></p>';
         }
       })
       .catch(error => {
-        console.error('Error:', error);
-        document.getElementById('historialContenido').innerHTML = '<p>Error al cargar el historial</p>';
+        console.error('<?php echo t('error'); ?>:', error);
+        document.getElementById('historialContenido').innerHTML = '<p><?php echo t('error_loading_history'); ?></p>';
       });
     }
 
@@ -1932,7 +2209,7 @@ if ($isAdmin) {
       contenido.innerHTML = '';
 
       if (historial.length === 0) {
-        contenido.innerHTML = '<p>No hay registros en el historial</p>';
+        contenido.innerHTML = '<p><?php echo t('no_records'); ?></p>';
         return;
       }
 
@@ -1945,8 +2222,8 @@ if ($isAdmin) {
             <span class="history-plate">${item.matricula}</span>
           </div>
           <div>
-            <span class="history-action ${item.accion}">${item.accion === 'entrada' ? 'Entrada' : 'Salida'}</span>
-            <span>Plaza ${item.plaza.toString().padStart(3, '0')}</span>
+            <span class="history-action ${item.accion}">${item.accion === 'entrada' ? '<?php echo t('entry'); ?>' : '<?php echo t('exit'); ?>'}</span>
+            <span><?php echo t('space'); ?> ${item.plaza.toString().padStart(3, '0')}</span>
           </div>
         `;
         contenido.appendChild(div);
@@ -1967,18 +2244,18 @@ if ($isAdmin) {
 
       plaza = parseInt(plaza);
       if (!plaza || plaza < 1 || plaza > 900) {
-        alert('Por favor, introduce un número de plaza válido (1-900)');
+        alert('<?php echo t('invalid_space_number'); ?>');
         return;
       }
 
       if (blockedPlazas[plaza] && !isAdmin) {
-        alert('Esta plaza está bloqueada para mantenimiento');
+        alert('<?php echo t('space_blocked'); ?>');
         return;
       }
 
       const plazaOcupada = Object.values(coches).some(coche => coche.plaza === plaza);
       if (plazaOcupada) {
-        if (!confirm(`La plaza ${plaza.toString().padStart(3, '0')} ya está ocupada. ¿Deseas sobrescribirla?`)) {
+        if (!confirm(`<?php echo t('space_already_occupied'); ?>`.replace('{space}', plaza.toString().padStart(3, '0')))) {
           return;
         }
       }
@@ -2004,12 +2281,12 @@ if ($isAdmin) {
             div.scrollIntoView({ behavior: 'smooth', block: 'center' });
           }
         } else {
-          alert('Error al guardar: ' + (data.message || 'Error desconocido'));
+          alert('<?php echo t('error_saving'); ?>: ' + (data.message || '<?php echo t('unknown_error'); ?>'));
         }
       })
       .catch(error => {
-        console.error('Error:', error);
-        alert('Error de conexión');
+        console.error('<?php echo t('error'); ?>:', error);
+        alert('<?php echo t('connection_error'); ?>');
       });
     }
 
@@ -2017,16 +2294,16 @@ if ($isAdmin) {
       const matriculaInput = matricula || document.getElementById('matriculaEliminar').value.toUpperCase().replace('-', '');
 
       if (!matriculaInput) {
-        alert('Por favor, introduce una matrícula');
+        alert('<?php echo t('please_enter_plate'); ?>');
         return;
       }
 
       if (!validarMatricula(matriculaInput)) {
-        alert('Formato de matrícula inválido. Debe ser 1234ABC o 1234-ABC (sin vocales ni Q/Ñ)');
+        alert('<?php echo t('invalid_plate_format'); ?>');
         return;
       }
 
-      if (!confirm(`¿Estás seguro de que quieres sacar el coche con matrícula ${matriculaInput} del parking?`)) {
+      if (!confirm(`<?php echo t('confirm_remove_car'); ?>`.replace('{plate}', matriculaInput))) {
         return;
       }
 
@@ -2048,12 +2325,12 @@ if ($isAdmin) {
           crearMapa();
           document.querySelectorAll('.plaza').forEach(p => p.classList.remove('resaltada'));
         } else {
-          alert('Error al eliminar: ' + (data.message || 'Matrícula no encontrada'));
+          alert('<?php echo t('error_deleting'); ?>: ' + (data.message || '<?php echo t('plate_not_found'); ?>'));
         }
       })
       .catch(error => {
-        console.error('Error:', error);
-        alert('Error de conexión');
+        console.error('<?php echo t('error'); ?>:', error);
+        alert('<?php echo t('connection_error'); ?>');
       });
     }
 
@@ -2065,7 +2342,7 @@ if ($isAdmin) {
     function vaciarTodasLasPlazas() {
       if (role !== 'master') return;
 
-      if (!confirm('¿Estás seguro de que deseas vaciar TODAS las plazas del parking?')) {
+      if (!confirm('<?php echo t('confirm_empty_spaces'); ?>')) {
         return;
       }
 
@@ -2079,19 +2356,19 @@ if ($isAdmin) {
       .then(res => res.json())
       .then(data => {
         if (data.status === 'success') {
-          alert(`Se han vaciado ${data.count} plazas correctamente`);
+          alert(`<?php echo t('success'); ?>: ${data.count} <?php echo t('spaces_emptied'); ?>`);
           for (const matricula in coches) {
             delete coches[matricula];
           }
           crearMapa();
           cerrarPopup('popupVaciarPlazas');
         } else {
-          alert('Error al vaciar las plazas');
+          alert('<?php echo t('error_emptying_spaces'); ?>');
         }
       })
       .catch(error => {
-        console.error('Error:', error);
-        alert('Error de conexión');
+        console.error('<?php echo t('error'); ?>:', error);
+        alert('<?php echo t('connection_error'); ?>');
       });
     }
 
@@ -2111,14 +2388,14 @@ if ($isAdmin) {
 
           if (Object.keys(perfil).length > 0) {
             perfilInfo.innerHTML = `
-              <p><strong>Nombre:</strong> ${perfil.nombre || 'No especificado'}</p>
-              <p><strong>Apellidos:</strong> ${perfil.apellidos || 'No especificados'}</p>
-              <p><strong>Email:</strong> ${perfil.email || 'No especificado'}</p>
-              <p><strong>Teléfono:</strong> ${perfil.telefono || 'No especificado'}</p>
-              <p><strong>Última actualización:</strong> ${formatDate(perfil.actualizado)}</p>
+              <p><strong><?php echo t('name'); ?>:</strong> ${perfil.nombre || '<?php echo t('not_specified'); ?>'}</p>
+              <p><strong><?php echo t('surname'); ?>:</strong> ${perfil.apellidos || '<?php echo t('not_specified'); ?>'}</p>
+              <p><strong><?php echo t('email'); ?>:</strong> ${perfil.email || '<?php echo t('not_specified'); ?>'}</p>
+              <p><strong><?php echo t('phone'); ?>:</strong> ${perfil.telefono || '<?php echo t('not_specified'); ?>'}</p>
+              <p><strong><?php echo t('last_update'); ?>:</strong> ${formatDate(perfil.actualizado)}</p>
             `;
           } else {
-            perfilInfo.innerHTML = '<p>No hay información de perfil guardada.</p>';
+            perfilInfo.innerHTML = '<p><?php echo t('no_profile_info'); ?></p>';
           }
 
           // Rellenar los campos del formulario
@@ -2131,8 +2408,8 @@ if ($isAdmin) {
         }
       })
       .catch(error => {
-        console.error('Error:', error);
-        alert('Error al cargar el perfil');
+        console.error('<?php echo t('error'); ?>:', error);
+        alert('<?php echo t('error_loading_profile'); ?>');
       });
     }
 
@@ -2154,15 +2431,15 @@ if ($isAdmin) {
       .then(res => res.json())
       .then(data => {
         if (data.status === 'success') {
-          alert('Perfil guardado correctamente');
+          alert('<?php echo t('profile_saved_success'); ?>');
           mostrarPerfil(); // Actualizar la vista
         } else {
-          alert('Error al guardar el perfil');
+          alert('<?php echo t('error_saving_profile'); ?>');
         }
       })
       .catch(error => {
-        console.error('Error:', error);
-        alert('Error de conexión');
+        console.error('<?php echo t('error'); ?>:', error);
+        alert('<?php echo t('connection_error'); ?>');
       });
     }
 
@@ -2219,12 +2496,12 @@ if ($isAdmin) {
           mostrarListaModeradores(data.data);
           mostrarPopup('popupModeradores');
         } else {
-          alert('Error al cargar moderadores');
+          alert('<?php echo t('error_loading_moderators'); ?>');
         }
       })
       .catch(error => {
-        console.error('Error:', error);
-        alert('Error de conexión');
+        console.error('<?php echo t('error'); ?>:', error);
+        alert('<?php echo t('connection_error'); ?>');
       });
     }
 
@@ -2233,7 +2510,7 @@ if ($isAdmin) {
       lista.innerHTML = '';
 
       if (moderadores.length === 0) {
-        lista.innerHTML = '<p>No hay moderadores registrados</p>';
+        lista.innerHTML = '<p><?php echo t('no_moderators'); ?></p>';
         return;
       }
 
@@ -2245,11 +2522,11 @@ if ($isAdmin) {
       const thead = document.createElement('thead');
       thead.innerHTML = `
         <tr>
-          <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Usuario</th>
-          <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Rol</th>
-          <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Estado</th>
-          <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Último login</th>
-          <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Acciones</th>
+          <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;"><?php echo t('username'); ?></th>
+          <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;"><?php echo t('role'); ?></th>
+          <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;"><?php echo t('status'); ?></th>
+          <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;"><?php echo t('last_login'); ?></th>
+          <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;"><?php echo t('actions'); ?></th>
         </tr>
       `;
       table.appendChild(thead);
@@ -2262,15 +2539,15 @@ if ($isAdmin) {
 
         // Estado como badge
         const estado = mod.active ?
-          '<span class="badge badge-active">✔ Activo</span>' :
-          '<span class="badge badge-inactive">✖ Inactivo</span>';
+          '<span class="badge badge-active">✔ <?php echo t('active'); ?></span>' :
+          '<span class="badge badge-inactive">✖ <?php echo t('inactive'); ?></span>';
 
         // Rol como badge
         const rolClass = mod.role === 'master' ? 'badge-master' : 'badge-moderator';
         const rol = `<span class="badge ${rolClass}">${mod.role.toUpperCase()}</span>`;
 
         // Último login formateado
-        const lastLogin = mod.last_login ? formatDate(mod.last_login) : 'Nunca';
+        const lastLogin = mod.last_login ? formatDate(mod.last_login) : '<?php echo t('never'); ?>';
 
         tr.innerHTML = `
           <td style="padding: 8px;">${mod.username}</td>
@@ -2278,7 +2555,7 @@ if ($isAdmin) {
           <td style="padding: 8px;">${estado}</td>
           <td style="padding: 8px;">${lastLogin}</td>
           <td style="padding: 8px;">
-            <button style="padding: 4px 8px; font-size: 12px;" onclick="editarModerador('${mod.username}')">Editar</button>
+            <button style="padding: 4px 8px; font-size: 12px;" onclick="editarModerador('${mod.username}')"><?php echo t('edit'); ?></button>
           </td>
         `;
         tbody.appendChild(tr);
@@ -2300,7 +2577,7 @@ if ($isAdmin) {
       const role = document.getElementById('nuevoModeradorRol').value;
 
       if (!username || !password) {
-        alert('Usuario y contraseña son obligatorios');
+        alert('<?php echo t('username_password_required'); ?>');
         return;
       }
 
@@ -2314,16 +2591,16 @@ if ($isAdmin) {
       .then(res => res.json())
       .then(data => {
         if (data.status === 'success') {
-          alert('Moderador agregado correctamente');
+          alert('<?php echo t('moderator_added_success'); ?>');
           cerrarPopup('popupAgregarModerador');
           mostrarModeradores(); // Actualizar lista
         } else {
-          alert('Error: ' + (data.message || 'Error desconocido'));
+          alert('<?php echo t('error'); ?>: ' + (data.message || '<?php echo t('unknown_error'); ?>'));
         }
       })
       .catch(error => {
-        console.error('Error:', error);
-        alert('Error de conexión');
+        console.error('<?php echo t('error'); ?>:', error);
+        alert('<?php echo t('connection_error'); ?>');
       });
     }
 
@@ -2348,15 +2625,15 @@ if ($isAdmin) {
             const infoDiv = document.getElementById('moderadorInfo');
             if (moderador.profile) {
               infoDiv.innerHTML = `
-                <p><strong>Nombre:</strong> ${moderador.profile.nombre || 'No especificado'}</p>
-                <p><strong>Apellidos:</strong> ${moderador.profile.apellidos || 'No especificados'}</p>
-                <p><strong>Email:</strong> ${moderador.profile.email || 'No especificado'}</p>
-                <p><strong>Teléfono:</strong> ${moderador.profile.telefono || 'No especificado'}</p>
-                <p><strong>Registrado:</strong> ${formatDate(moderador.created_at)}</p>
-                <p><strong>Último login:</strong> ${moderador.last_login ? formatDate(moderador.last_login) : 'Nunca'}</p>
+                <p><strong><?php echo t('name'); ?>:</strong> ${moderador.profile.nombre || '<?php echo t('not_specified'); ?>'}</p>
+                <p><strong><?php echo t('surname'); ?>:</strong> ${moderador.profile.apellidos || '<?php echo t('not_specified'); ?>'}</p>
+                <p><strong><?php echo t('email'); ?>:</strong> ${moderador.profile.email || '<?php echo t('not_specified'); ?>'}</p>
+                <p><strong><?php echo t('phone'); ?>:</strong> ${moderador.profile.telefono || '<?php echo t('not_specified'); ?>'}</p>
+                <p><strong><?php echo t('registered'); ?>:</strong> ${formatDate(moderador.created_at)}</p>
+                <p><strong><?php echo t('last_login'); ?>:</strong> ${moderador.last_login ? formatDate(moderador.last_login) : '<?php echo t('never'); ?>'}</p>
               `;
             } else {
-              infoDiv.innerHTML = '<p>No hay información de perfil disponible</p>';
+              infoDiv.innerHTML = '<p><?php echo t('no_moderator_info'); ?></p>';
             }
 
             mostrarPopup('popupEditarModerador');
@@ -2364,8 +2641,8 @@ if ($isAdmin) {
         }
       })
       .catch(error => {
-        console.error('Error:', error);
-        alert('Error al cargar datos del moderador');
+        console.error('<?php echo t('error'); ?>:', error);
+        alert('<?php echo t('error_loading_moderator'); ?>');
       });
     }
 
@@ -2384,16 +2661,16 @@ if ($isAdmin) {
       .then(res => res.json())
       .then(data => {
         if (data.status === 'success') {
-          alert('Moderador actualizado correctamente');
+          alert('<?php echo t('moderator_updated_success'); ?>');
           mostrarModeradores(); // Actualizar lista
           cerrarPopup('popupEditarModerador');
         } else {
-          alert('Error: ' + (data.message || 'Error desconocido'));
+          alert('<?php echo t('error'); ?>: ' + (data.message || '<?php echo t('unknown_error'); ?>'));
         }
       })
       .catch(error => {
-        console.error('Error:', error);
-        alert('Error de conexión');
+        console.error('<?php echo t('error'); ?>:', error);
+        alert('<?php echo t('connection_error'); ?>');
       });
     }
 
@@ -2411,12 +2688,12 @@ if ($isAdmin) {
       const confirmPassword = document.getElementById('confirmarPassword').value;
 
       if (!password) {
-        alert('La contraseña no puede estar vacía');
+        alert('<?php echo t('password_cannot_be_empty'); ?>');
         return;
       }
 
       if (password !== confirmPassword) {
-        alert('Las contraseñas no coinciden');
+        alert('<?php echo t('passwords_not_match'); ?>');
         return;
       }
 
@@ -2430,15 +2707,15 @@ if ($isAdmin) {
       .then(res => res.json())
       .then(data => {
         if (data.status === 'success') {
-          alert('Contraseña actualizada correctamente');
+          alert('<?php echo t('password_updated_success'); ?>');
           cerrarPopup('popupCambiarPassword');
         } else {
-          alert('Error: ' + (data.message || 'Error desconocido'));
+          alert('<?php echo t('error'); ?>: ' + (data.message || '<?php echo t('unknown_error'); ?>'));
         }
       })
       .catch(error => {
-        console.error('Error:', error);
-        alert('Error de conexión');
+        console.error('<?php echo t('error'); ?>:', error);
+        alert('<?php echo t('connection_error'); ?>');
       });
     }
 
@@ -2463,16 +2740,16 @@ if ($isAdmin) {
       .then(res => res.json())
       .then(data => {
         if (data.status === 'success') {
-          alert('Moderador eliminado correctamente');
+          alert('<?php echo t('moderator_deleted_success'); ?>');
           cerrarPopup('popupEliminarModerador');
           mostrarModeradores(); // Actualizar lista
         } else {
-          alert('Error: ' + (data.message || 'Error desconocido'));
+          alert('<?php echo t('error'); ?>: ' + (data.message || '<?php echo t('unknown_error'); ?>'));
         }
       })
       .catch(error => {
-        console.error('Error:', error);
-        alert('Error de conexión');
+        console.error('<?php echo t('error'); ?>:', error);
+        alert('<?php echo t('connection_error'); ?>');
       });
     }
 
@@ -2531,7 +2808,7 @@ if ($isAdmin) {
       setInterval(actualizarReloj, 1000);
 
       if (window.innerWidth <= 480) {
-        document.getElementById('matriculaInput').placeholder = "Matrícula";
+        document.getElementById('matriculaInput').placeholder = "<?php echo t('plate'); ?>";
       }
 
       // Fechas por defecto en historial
