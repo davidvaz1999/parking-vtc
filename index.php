@@ -50,16 +50,17 @@ $defaultLanguage = 'es';
 // Translations
 $translations = [
     'es' => [
-        'title' => 'Plazas de aparcamiento - MooveCars Barcelona',
+        'title' => 'Plazas de aparcamiento - Barcelona',
         'total_spaces' => 'Plazas totales',
         'occupied_spaces' => 'Plazas ocupadas',
         'free_spaces' => 'Plazas libres',
-        'blocked_spaces' => 'Plazas bloqueadas',
+        'blocked_spaces' => 'Bloqueada (mantenimiento)',
         'recent_occupied' => 'Ocupado (menos de 4h)',
         'medium_occupied' => 'Ocupado (4-8h)',
         'old_occupied' => 'Ocupado (más de 8h)',
         'free' => 'Libre',
-        'blocked' => 'Bloqueada',
+        'blocked' => 'Bloqueada (mantenimiento)',
+        'cleaning' => 'Bloqueada (limpieza)',
         'plate_placeholder' => 'Introduce la matrícula (ej: 1234ABC)',
         'search' => 'Buscar',
         'login' => 'Login',
@@ -67,7 +68,7 @@ $translations = [
         'all_spaces' => 'Todas las plazas',
         'occupied' => 'Plazas ocupadas',
         'free' => 'Plazas libres',
-        'blocked' => 'Plazas bloqueadas',
+        'blocked' => 'Bloqueada (mantenimiento)',
         'vehicle_found' => 'Vehículo encontrado',
         'vehicle_parked_at' => 'El vehículo con matrícula <strong id="matriculaEncontrada"></strong> está estacionado en la plaza <strong id="plazaEncontrada"></strong>.',
         'remove_from_parking' => 'Sacar del parking',
@@ -145,6 +146,7 @@ $translations = [
         'invalid_plate_format' => 'Formato de matrícula inválido. Debe ser 1234ABC o 1234-ABC (sin vocales ni Q/Ñ)',
         'invalid_space_number' => 'Por favor, introduce un número de plaza válido (1-900)',
         'space_blocked' => 'Esta plaza está bloqueada para mantenimiento',
+        'space_cleaning' => 'Esta plaza está bloqueada para limpieza',
         'space_already_occupied' => 'La plaza {space} ya está ocupada. ¿Deseas sobrescribirla?',
         'confirm_remove_car' => '¿Estás seguro de que quieres sacar el coche con matrícula {plate} del parking?',
         'confirm_empty_spaces' => '¿Estás seguro de que deseas vaciar TODAS las plazas del parking?',
@@ -159,10 +161,16 @@ $translations = [
         'last_login' => 'Último login',
         'not_specified' => 'No especificado',
         'language' => 'Idioma',
-        'please_enter_plate' => 'Por favor, introduce una matrícula'
+        'please_enter_plate' => 'Por favor, introduce una matrícula',
+        'settings' => 'Ajustes',
+        'show_parking_time' => 'Mostrar tiempo de estacionamiento',
+        'simple_view' => 'Vista simple',
+        'detailed_view' => 'Vista detallada',
+        'settings_saved' => 'Ajustes guardados',
+        'last_update' => 'Última actualización'
     ],
     'en' => [
-        'title' => 'Parking Spaces - MooveCars Barcelona',
+        'title' => 'Parking Spaces - Barcelona',
         'total_spaces' => 'Total spaces',
         'occupied_spaces' => 'Occupied spaces',
         'free_spaces' => 'Free spaces',
@@ -171,7 +179,8 @@ $translations = [
         'medium_occupied' => 'Occupied (4-8h)',
         'old_occupied' => 'Occupied (more than 8h)',
         'free' => 'Free',
-        'blocked' => 'Blocked',
+        'blocked' => 'Blocked (maintenance)',
+        'cleaning' => 'Blocked (cleaning)',
         'plate_placeholder' => 'Enter license plate (e.g. 1234ABC)',
         'search' => 'Search',
         'login' => 'Login',
@@ -257,6 +266,7 @@ $translations = [
         'invalid_plate_format' => 'Invalid license plate format. Must be 1234ABC or 1234-ABC (no vowels or Q/Ñ)',
         'invalid_space_number' => 'Please enter a valid space number (1-900)',
         'space_blocked' => 'This space is blocked for maintenance',
+        'space_cleaning' => 'This space is blocked for cleaning',
         'space_already_occupied' => 'Space {space} is already occupied. Do you want to overwrite it?',
         'confirm_remove_car' => 'Are you sure you want to remove the car with license plate {plate} from parking?',
         'confirm_empty_spaces' => 'Are you sure you want to empty ALL parking spaces?',
@@ -271,7 +281,13 @@ $translations = [
         'last_login' => 'Last login',
         'not_specified' => 'Not specified',
         'language' => 'Language',
-        'please_enter_plate' => 'Please enter a license plate'
+        'please_enter_plate' => 'Please enter a license plate',
+        'settings' => 'Settings',
+        'show_parking_time' => 'Show parking time',
+        'simple_view' => 'Simple view',
+        'detailed_view' => 'Detailed view',
+        'settings_saved' => 'Settings saved',
+        'last_update' => 'Last update'
     ]
 ];
 
@@ -332,6 +348,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Bloquear/desbloquear plazas
     if (isset($_POST['action']) && $_POST['action'] === 'toggle_block' && isset($_SESSION['admin'])) {
         $plaza = intval($_POST['plaza'] ?? 0);
+        $type = $_POST['type'] ?? 'blocked'; // 'blocked' or 'cleaning'
 
         if ($plaza > 0 && $plaza <= 900) {
             $blocked = json_decode(file_get_contents($blockedFile), true) ?: [];
@@ -339,11 +356,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (isset($blocked[$plaza])) {
                 unset($blocked[$plaza]);
             } else {
-                $blocked[$plaza] = true;
+                $blocked[$plaza] = $type;
             }
 
             file_put_contents($blockedFile, json_encode($blocked, JSON_PRETTY_PRINT));
-            echo json_encode(['status' => 'success', 'blocked' => isset($blocked[$plaza])]);
+            echo json_encode(['status' => 'success', 'blocked' => isset($blocked[$plaza]), 'type' => $blocked[$plaza] ?? null]);
             exit;
         }
 
@@ -362,7 +379,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             // Verificar si la plaza está bloqueada
             if (isset($blocked[$plaza]) && !isset($_SESSION['admin'])) {
-                echo json_encode(['status' => 'error', 'message' => 'Plaza en mantenimiento']);
+                echo json_encode(['status' => 'error', 'message' => $blocked[$plaza] === 'cleaning' ? 'Plaza en limpieza' : 'Plaza en mantenimiento']);
                 exit;
             }
 
@@ -736,9 +753,11 @@ $currentLanguage = $_SESSION['language'] ?? $defaultLanguage;
       --medium-color: #f1c40f;
       --old-color: #e74c3c;
       --blocked-color: #e74c3c;
+      --cleaning-color: #3498db;
       --clock-color: #2c3e50;
       --master-color: #9b59b6;
       --moderator-color: #3498db;
+      --occupied-color: #f39c12;
     }
 
     * {
@@ -872,6 +891,14 @@ $currentLanguage = $_SESSION['language'] ?? $defaultLanguage;
       background-color: #8e44ad;
     }
 
+    button.settings {
+      background-color: #7f8c8d;
+    }
+
+    button.settings:hover {
+      background-color: #6c7a7d;
+    }
+
     .legend {
       display: flex;
       flex-wrap: wrap;
@@ -899,6 +926,21 @@ $currentLanguage = $_SESSION['language'] ?? $defaultLanguage;
     }
 
     .legend-color.blocked::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 50%;
+      width: 100%;
+      height: 2px;
+      background-color: white;
+      transform: rotate(45deg);
+    }
+
+    .legend-color.cleaning {
+      background-color: var(--cleaning-color);
+    }
+
+    .legend-color.cleaning::before {
       content: "";
       position: absolute;
       left: 0;
@@ -954,6 +996,12 @@ $currentLanguage = $_SESSION['language'] ?? $defaultLanguage;
       font-weight: bold;
     }
 
+    .plaza.ocupada.simple {
+      background-color: var(--occupied-color);
+      color: white;
+      font-weight: bold;
+    }
+
     .plaza.bloqueada {
       background-color: var(--blocked-color);
       color: white;
@@ -963,6 +1011,26 @@ $currentLanguage = $_SESSION['language'] ?? $defaultLanguage;
     }
 
     .plaza.bloqueada::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 50%;
+      width: 100%;
+      height: 2px;
+      background-color: white;
+      box-shadow: 0 0 2px rgba(0,0,0,0.5);
+      transform: rotate(45deg);
+    }
+
+    .plaza.limpieza {
+      background-color: var(--cleaning-color);
+      color: white;
+      font-weight: bold;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .plaza.limpieza::before {
       content: "";
       position: absolute;
       left: 0;
@@ -1235,7 +1303,7 @@ $currentLanguage = $_SESSION['language'] ?? $defaultLanguage;
       background-color: #9b59b6;
     }
 
-    .login-button {
+    .settings-button {
       position: fixed;
       bottom: 20px;
       right: 20px;
@@ -1252,6 +1320,12 @@ $currentLanguage = $_SESSION['language'] ?? $defaultLanguage;
       cursor: pointer;
       box-shadow: 0 2px 5px rgba(0,0,0,0.2);
       z-index: 10;
+      transition: all 0.3s;
+    }
+
+    .settings-button:hover {
+      transform: scale(1.1);
+      background-color: var(--secondary-color);
     }
 
     .profile-info {
@@ -1381,6 +1455,58 @@ $currentLanguage = $_SESSION['language'] ?? $defaultLanguage;
       border: none;
       border-radius: 4px;
       cursor: pointer;
+    }
+
+    .settings-popup {
+      position: fixed;
+      bottom: 80px;
+      right: 20px;
+      background-color: white;
+      padding: 15px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      z-index: 1000;
+      display: none;
+      width: 90%;
+      max-width: 300px;
+    }
+
+    .settings-popup.active {
+      display: block;
+    }
+
+    .settings-item {
+      margin-bottom: 10px;
+    }
+
+    .settings-item label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+    }
+
+    .language-switcher {
+      display: flex;
+      gap: 10px;
+      margin-top: 15px;
+      justify-content: center;
+    }
+
+    .language-option {
+      cursor: pointer;
+      padding: 5px 10px;
+      border-radius: 4px;
+      transition: all 0.2s;
+    }
+
+    .language-option:hover {
+      background-color: #f0f0f0;
+    }
+
+    .language-option.active {
+      background-color: var(--secondary-color);
+      color: white;
     }
 
     @media (min-width: 481px) {
@@ -1520,6 +1646,38 @@ $currentLanguage = $_SESSION['language'] ?? $defaultLanguage;
   </div>
   <?php endif; ?>
 
+  <button class="settings-button" onclick="toggleSettings()">⚙️</button>
+  <div class="settings-popup" id="settingsPopup">
+    <h3><?php echo t('settings'); ?></h3>
+    <div class="settings-item">
+      <label>
+        <input type="checkbox" id="showParkingTime">
+        <?php echo t('show_parking_time'); ?>
+      </label>
+    </div>
+    <div class="settings-item">
+      <label>
+        <input type="radio" name="viewMode" value="simple" id="simpleView" checked>
+        <?php echo t('simple_view'); ?>
+      </label>
+    </div>
+    <div class="settings-item">
+      <label>
+        <input type="radio" name="viewMode" value="detailed" id="detailedView">
+        <?php echo t('detailed_view'); ?>
+      </label>
+    </div>
+    <div class="language-switcher">
+      <div class="language-option <?php echo $currentLanguage === 'es' ? 'active' : ''; ?>" onclick="changeLanguage('es')">
+        🇪🇸 Español
+      </div>
+      <div class="language-option <?php echo $currentLanguage === 'en' ? 'active' : ''; ?>" onclick="changeLanguage('en')">
+        🇺🇸 English
+      </div>
+    </div>
+    <button onclick="saveSettings()" style="margin-top: 15px;"><?php echo t('save'); ?></button>
+  </div>
+
   <div class="container">
     <h1><?php echo t('title'); ?></h1>
     <div class="clock" id="reloj"></div>
@@ -1543,28 +1701,7 @@ $currentLanguage = $_SESSION['language'] ?? $defaultLanguage;
       </div>
     </div>
 
-    <div class="legend">
-      <div class="legend-item">
-        <div class="legend-color" style="background-color: var(--recent-color);"></div>
-        <span><?php echo t('recent_occupied'); ?></span>
-      </div>
-      <div class="legend-item">
-        <div class="legend-color" style="background-color: var(--medium-color);"></div>
-        <span><?php echo t('medium_occupied'); ?></span>
-      </div>
-      <div class="legend-item">
-        <div class="legend-color" style="background-color: var(--old-color);"></div>
-        <span><?php echo t('old_occupied'); ?></span>
-      </div>
-      <div class="legend-item">
-        <div class="legend-color" style="background-color: var(--light-color);"></div>
-        <span><?php echo t('free'); ?></span>
-      </div>
-      <div class="legend-item">
-        <div class="legend-color blocked"></div>
-        <span><?php echo t('blocked'); ?></span>
-      </div>
-    </div>
+    <div class="legend" id="legendContainer"></div>
 
     <div class="controls">
       <div class="search-container">
@@ -1807,20 +1944,6 @@ $currentLanguage = $_SESSION['language'] ?? $defaultLanguage;
     </div>
   </div>
 
-  <?php if (!$isAdmin): ?>
-  <button class="login-button" onclick="mostrarPopup('loginContainer')">🔑</button>
-  <?php endif; ?>
-
-  <div class="language-switcher" style="position: fixed; top: 10px; right: 10px; z-index: 1000;">
-    <select id="languageSelect" onchange="changeLanguage(this.value)" style="padding: 5px; border-radius: 4px;">
-      <?php foreach ($availableLanguages as $code => $name): ?>
-        <option value="<?php echo $code; ?>" <?php echo $currentLanguage === $code ? 'selected' : ''; ?>>
-          <?php echo $name; ?>
-        </option>
-      <?php endforeach; ?>
-    </select>
-  </div>
-
   <script>
     const coches = <?php echo json_encode($coches); ?>;
     const blockedPlazas = <?php echo json_encode($blocked); ?>;
@@ -1830,6 +1953,98 @@ $currentLanguage = $_SESSION['language'] ?? $defaultLanguage;
     let matriculaPendiente = '';
     let filtroActual = 'todas';
     let autocompleteTimeout = null;
+    let settings = {
+      showParkingTime: true,
+      viewMode: 'simple'
+    };
+
+    // Cargar configuración desde localStorage
+    function loadSettings() {
+      const savedSettings = localStorage.getItem('parkingSettings');
+      if (savedSettings) {
+        settings = JSON.parse(savedSettings);
+      }
+
+      document.getElementById('showParkingTime').checked = settings.showParkingTime;
+      if (settings.viewMode === 'simple') {
+        document.getElementById('simpleView').checked = true;
+      } else {
+        document.getElementById('detailedView').checked = true;
+      }
+
+      updateLegend();
+    }
+
+    // Guardar configuración en localStorage
+    function saveSettings() {
+      settings.showParkingTime = document.getElementById('showParkingTime').checked;
+      settings.viewMode = document.querySelector('input[name="viewMode"]:checked').value;
+
+      localStorage.setItem('parkingSettings', JSON.stringify(settings));
+      alert('<?php echo t('settings_saved'); ?>');
+      toggleSettings();
+      crearMapa();
+      updateLegend();
+    }
+
+    // Mostrar/ocultar ajustes
+    function toggleSettings() {
+      document.getElementById('settingsPopup').classList.toggle('active');
+    }
+
+    // Actualizar leyenda según configuración
+    function updateLegend() {
+      const legendContainer = document.getElementById('legendContainer');
+      legendContainer.innerHTML = '';
+
+      if (settings.viewMode === 'detailed' && settings.showParkingTime) {
+        legendContainer.innerHTML = `
+          <div class="legend-item">
+            <div class="legend-color" style="background-color: var(--recent-color);"></div>
+            <span><?php echo t('recent_occupied'); ?></span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color" style="background-color: var(--medium-color);"></div>
+            <span><?php echo t('medium_occupied'); ?></span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color" style="background-color: var(--old-color);"></div>
+            <span><?php echo t('old_occupied'); ?></span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color" style="background-color: var(--light-color);"></div>
+            <span><?php echo t('free'); ?></span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color blocked"></div>
+            <span><?php echo t('blocked'); ?></span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color cleaning"></div>
+            <span><?php echo t('cleaning'); ?></span>
+          </div>
+        `;
+      } else {
+        legendContainer.innerHTML = `
+          <div class="legend-item">
+            <div class="legend-color" style="background-color: var(--occupied-color);"></div>
+            <span><?php echo t('occupied'); ?></span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color" style="background-color: var(--light-color);"></div>
+            <span><?php echo t('free'); ?></span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color blocked"></div>
+            <span><?php echo t('blocked'); ?></span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color cleaning"></div>
+            <span><?php echo t('cleaning'); ?></span>
+          </div>
+        `;
+      }
+    }
 
     // Función para asignar eventos de forma segura
     const asignarEvento = (id, evento, callback) => {
@@ -2005,7 +2220,7 @@ $currentLanguage = $_SESSION['language'] ?? $defaultLanguage;
       .then(() => location.reload());
     }
 
-    function toggleBlockPlaza(plaza) {
+    function toggleBlockPlaza(plaza, type) {
       if (!isAdmin) return;
 
       fetch('index.php', {
@@ -2013,13 +2228,13 @@ $currentLanguage = $_SESSION['language'] ?? $defaultLanguage;
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded'
         },
-        body: `action=toggle_block&plaza=${plaza}`
+        body: `action=toggle_block&plaza=${plaza}&type=${type}`
       })
       .then(res => res.json())
       .then(data => {
         if (data.status === 'success') {
           if (data.blocked) {
-            blockedPlazas[plaza] = true;
+            blockedPlazas[plaza] = type;
           } else {
             delete blockedPlazas[plaza];
           }
@@ -2042,24 +2257,32 @@ $currentLanguage = $_SESSION['language'] ?? $defaultLanguage;
 
         // Verificar si la plaza está bloqueada
         if (blockedPlazas[i]) {
-          div.classList.add('bloqueada');
+          if (blockedPlazas[i] === 'cleaning') {
+            div.classList.add('limpieza');
+          } else {
+            div.classList.add('bloqueada');
+          }
           if (isAdmin) {
-            div.onclick = () => toggleBlockPlaza(i);
+            div.onclick = () => toggleBlockPlaza(i, blockedPlazas[i]);
           }
         } else {
           // Verificar si la plaza está ocupada
           const matriculaEnPlaza = Object.entries(coches).find(([_, datos]) => datos.plaza === i);
 
           if (matriculaEnPlaza) {
-            const ahora = Math.floor(Date.now() / 1000);
-            const horasOcupacion = (ahora - matriculaEnPlaza[1].timestamp) / 3600;
+            if (settings.viewMode === 'detailed' && settings.showParkingTime) {
+              const ahora = Math.floor(Date.now() / 1000);
+              const horasOcupacion = (ahora - matriculaEnPlaza[1].timestamp) / 3600;
 
-            if (horasOcupacion < 4) {
-              div.classList.add('ocupada', 'reciente');
-            } else if (horasOcupacion < 8) {
-              div.classList.add('ocupada', 'medio');
+              if (horasOcupacion < 4) {
+                div.classList.add('ocupada', 'reciente');
+              } else if (horasOcupacion < 8) {
+                div.classList.add('ocupada', 'medio');
+              } else {
+                div.classList.add('ocupada', 'antiguo');
+              }
             } else {
-              div.classList.add('ocupada', 'antiguo');
+              div.classList.add('ocupada', 'simple');
             }
 
             if (window.innerWidth > 480) {
@@ -2073,7 +2296,13 @@ $currentLanguage = $_SESSION['language'] ?? $defaultLanguage;
               div.appendChild(info);
             }
           } else if (isAdmin) {
-            div.onclick = () => toggleBlockPlaza(i);
+            div.onclick = () => {
+              if (confirm('¿Qué tipo de bloqueo deseas aplicar?')) {
+                toggleBlockPlaza(i, 'blocked');
+              } else {
+                toggleBlockPlaza(i, 'cleaning');
+              }
+            };
           }
         }
 
@@ -2085,13 +2314,13 @@ $currentLanguage = $_SESSION['language'] ?? $defaultLanguage;
             div.style.display = 'flex';
           }
         } else if (filtroActual === 'libres') {
-          if (div.classList.contains('ocupada') || div.classList.contains('bloqueada')) {
+          if (div.classList.contains('ocupada') || div.classList.contains('bloqueada') || div.classList.contains('limpieza')) {
             div.style.display = 'none';
           } else {
             div.style.display = 'flex';
           }
         } else if (filtroActual === 'bloqueadas') {
-          if (!div.classList.contains('bloqueada')) {
+          if (!div.classList.contains('bloqueada') && !div.classList.contains('limpieza')) {
             div.style.display = 'none';
           } else {
             div.style.display = 'flex';
@@ -2249,7 +2478,7 @@ $currentLanguage = $_SESSION['language'] ?? $defaultLanguage;
       }
 
       if (blockedPlazas[plaza] && !isAdmin) {
-        alert('<?php echo t('space_blocked'); ?>');
+        alert(blockedPlazas[plaza] === 'cleaning' ? '<?php echo t('space_cleaning'); ?>' : '<?php echo t('space_blocked'); ?>');
         return;
       }
 
@@ -2755,6 +2984,9 @@ $currentLanguage = $_SESSION['language'] ?? $defaultLanguage;
 
     // Inicialización cuando el DOM está cargado
     document.addEventListener('DOMContentLoaded', function() {
+      // Cargar configuración
+      loadSettings();
+
       // Asignar eventos a elementos principales
       const matriculaInput = document.getElementById('matriculaInput');
       if (matriculaInput) {
@@ -2829,6 +3061,11 @@ $currentLanguage = $_SESSION['language'] ?? $defaultLanguage;
         if (suggestions) {
           suggestions.style.display = 'none';
         }
+      }
+
+      // Cerrar ajustes si se hace clic fuera
+      if (!e.target.closest('.settings-button') && !e.target.closest('.settings-popup')) {
+        document.getElementById('settingsPopup').classList.remove('active');
       }
     });
   </script>
