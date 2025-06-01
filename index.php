@@ -13,6 +13,8 @@ $adminFile = 'admin.json';
 $blockedFile = 'blocked.json';
 $profilesFile = 'profiles.json';
 $matriculasFile = 'matriculas.json';
+$nonNumberedFile = 'non_numbered.json';
+$observationsFile = 'observations.json';
 
 // Create files if they don't exist
 if (!file_exists($jsonFile)) {
@@ -42,6 +44,12 @@ if (!file_exists($profilesFile)) {
 if (!file_exists($matriculasFile)) {
     file_put_contents($matriculasFile, json_encode([]));
 }
+if (!file_exists($nonNumberedFile)) {
+    file_put_contents($nonNumberedFile, json_encode([]));
+}
+if (!file_exists($observationsFile)) {
+    file_put_contents($observationsFile, json_encode([]));
+}
 
 // Language handling
 $availableLanguages = ['es' => 'Español', 'en' => 'English'];
@@ -50,17 +58,18 @@ $defaultLanguage = 'es';
 // Translations
 $translations = [
     'es' => [
-        'title' => 'Plazas de aparcamiento - Barcelona',
+        'title' => 'Plazas de aparcamiento - MooveCars Barcelona',
         'total_spaces' => 'Plazas totales',
         'occupied_spaces' => 'Plazas ocupadas',
         'free_spaces' => 'Plazas libres',
-        'blocked_spaces' => 'Bloqueada (mantenimiento)',
+        'blocked_spaces' => 'Plazas bloqueadas',
         'recent_occupied' => 'Ocupado (menos de 4h)',
         'medium_occupied' => 'Ocupado (4-8h)',
         'old_occupied' => 'Ocupado (más de 8h)',
         'free' => 'Libre',
         'blocked' => 'Bloqueada (mantenimiento)',
         'cleaning' => 'Bloqueada (limpieza)',
+        'non_numbered' => 'Plaza no numerada',
         'plate_placeholder' => 'Introduce la matrícula (ej: 1234ABC)',
         'search' => 'Buscar',
         'login' => 'Login',
@@ -68,7 +77,7 @@ $translations = [
         'all_spaces' => 'Todas las plazas',
         'occupied' => 'Plazas ocupadas',
         'free' => 'Plazas libres',
-        'blocked' => 'Bloqueada (mantenimiento)',
+        'blocked' => 'Plazas bloqueadas',
         'vehicle_found' => 'Vehículo encontrado',
         'vehicle_parked_at' => 'El vehículo con matrícula <strong id="matriculaEncontrada"></strong> está estacionado en la plaza <strong id="plazaEncontrada"></strong>.',
         'remove_from_parking' => 'Sacar del parking',
@@ -82,6 +91,10 @@ $translations = [
         'park_vehicle_title' => 'Aparcar vehículo',
         'enter_space_number' => 'Introduce el número de plaza para la matrícula <strong id="matriculaAparcar"></strong>:',
         'space_number_placeholder' => 'Número de plaza (1-900)',
+        'nearest_space_placeholder' => 'Plaza numerada más cercana',
+        'non_numbered_checkbox' => 'Plaza sin número',
+        'observations' => 'Observaciones',
+        'observations_placeholder' => 'Detalles sobre la ubicación de la plaza',
         'confirm' => 'Confirmar',
         'remove_car_title' => 'Sacar coche del parking',
         'enter_plate_to_remove' => 'Introduce la matrícula del coche que vas a sacar:',
@@ -167,10 +180,18 @@ $translations = [
         'simple_view' => 'Vista simple',
         'detailed_view' => 'Vista detallada',
         'settings_saved' => 'Ajustes guardados',
-        'last_update' => 'Última actualización'
+        'last_update' => 'Última actualización',
+        'associated_space' => 'Asociada a plaza {space}',
+        'manage_non_numbered' => 'Gestionar plaza no numerada',
+        'non_numbered_info' => 'Esta plaza no tiene número. Está asociada a la plaza {space}',
+        'save_association' => 'Guardar asociación',
+        'edit_observations' => 'Editar observaciones',
+        'save_observations' => 'Guardar observaciones',
+        'press_space_info' => 'Presiona sobre cualquier plaza para ver su ubicación aproximada',
+        'location_info' => 'Ubicación: {observations}'
     ],
     'en' => [
-        'title' => 'Parking Spaces - Barcelona',
+        'title' => 'Parking Spaces - MooveCars Barcelona',
         'total_spaces' => 'Total spaces',
         'occupied_spaces' => 'Occupied spaces',
         'free_spaces' => 'Free spaces',
@@ -181,6 +202,7 @@ $translations = [
         'free' => 'Free',
         'blocked' => 'Blocked (maintenance)',
         'cleaning' => 'Blocked (cleaning)',
+        'non_numbered' => 'Non-numbered space',
         'plate_placeholder' => 'Enter license plate (e.g. 1234ABC)',
         'search' => 'Search',
         'login' => 'Login',
@@ -202,6 +224,10 @@ $translations = [
         'park_vehicle_title' => 'Park Vehicle',
         'enter_space_number' => 'Enter the space number for license plate <strong id="matriculaAparcar"></strong>:',
         'space_number_placeholder' => 'Space number (1-900)',
+        'nearest_space_placeholder' => 'Nearest numbered space',
+        'non_numbered_checkbox' => 'Non-numbered space',
+        'observations' => 'Observations',
+        'observations_placeholder' => 'Details about the space location',
         'confirm' => 'Confirm',
         'remove_car_title' => 'Remove car from parking',
         'enter_plate_to_remove' => 'Enter the license plate of the car you want to remove:',
@@ -287,7 +313,15 @@ $translations = [
         'simple_view' => 'Simple view',
         'detailed_view' => 'Detailed view',
         'settings_saved' => 'Settings saved',
-        'last_update' => 'Last update'
+        'last_update' => 'Last update',
+        'associated_space' => 'Associated with space {space}',
+        'manage_non_numbered' => 'Manage non-numbered space',
+        'non_numbered_info' => 'This space has no number. It is associated with space {space}',
+        'save_association' => 'Save association',
+        'edit_observations' => 'Edit observations',
+        'save_observations' => 'Save observations',
+        'press_space_info' => 'Press any space to see its approximate location',
+        'location_info' => 'Location: {observations}'
     ]
 ];
 
@@ -308,6 +342,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             echo json_encode(['status' => 'error', 'message' => 'Invalid language']);
         }
+        exit;
+    }
+
+    // Get non-numbered spaces
+    if (isset($_POST['action']) && $_POST['action'] === 'get_non_numbered') {
+        $nonNumbered = json_decode(file_get_contents($nonNumberedFile), true) ?: [];
+        echo json_encode(['status' => 'success', 'data' => $nonNumbered]);
+        exit;
+    }
+
+    // Save non-numbered space association
+    if (isset($_POST['action']) && $_POST['action'] === 'save_non_numbered' && isset($_SESSION['admin'])) {
+        $nonNumbered = json_decode(file_get_contents($nonNumberedFile), true) ?: [];
+        $nonNumbered[$_POST['non_numbered_id']] = intval($_POST['numbered_id']);
+        file_put_contents($nonNumberedFile, json_encode($nonNumbered, JSON_PRETTY_PRINT));
+        echo json_encode(['status' => 'success']);
+        exit;
+    }
+
+    // Get observations
+    if (isset($_POST['action']) && $_POST['action'] === 'get_observations') {
+        $observations = json_decode(file_get_contents($observationsFile), true) ?: [];
+        echo json_encode(['status' => 'success', 'data' => $observations]);
+        exit;
+    }
+
+    // Save observations
+    if (isset($_POST['action']) && $_POST['action'] === 'save_observations' && isset($_SESSION['admin'])) {
+        $observations = json_decode(file_get_contents($observationsFile), true) ?: [];
+        $observations[$_POST['space']] = $_POST['observations'];
+        file_put_contents($observationsFile, json_encode($observations, JSON_PRETTY_PRINT));
+        echo json_encode(['status' => 'success']);
         exit;
     }
 
@@ -371,49 +437,61 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Guardar nuevas matrículas
     if (isset($_POST['action']) && $_POST['action'] === 'guardar') {
         $matricula = strtoupper(trim(str_replace('-', '', $_POST['matricula'] ?? '')));
-        $plaza = intval($_POST['plaza'] ?? 0);
+        $plaza = $_POST['plaza'] ?? '';
+        $isNonNumbered = isset($_POST['non_numbered']) && $_POST['non_numbered'] === 'true';
+        $nearestSpace = isset($_POST['nearest_space']) ? intval($_POST['nearest_space']) : null;
 
-        // Validación
-        if (preg_match('/^[0-9BCDFGHJKLMNPRSTVWXYZ]{4}[0-9BCDFGHJKLMNPRSTVWXYZ]{3}$/', $matricula) && $plaza > 0 && $plaza <= 900) {
-            $blocked = json_decode(file_get_contents($blockedFile), true) ?: [];
+        // Validación para plazas numeradas (1-900)
+        $isNumberedPlaza = !$isNonNumbered && is_numeric($plaza) && $plaza > 0 && $plaza <= 900;
 
-            // Verificar si la plaza está bloqueada
-            if (isset($blocked[$plaza]) && !isset($_SESSION['admin'])) {
-                echo json_encode(['status' => 'error', 'message' => $blocked[$plaza] === 'cleaning' ? 'Plaza en limpieza' : 'Plaza en mantenimiento']);
-                exit;
-            }
-
-            $coches = json_decode(file_get_contents($jsonFile), true) ?: [];
-            $historial = json_decode(file_get_contents($historyFile), true) ?: [];
-            $matriculas = json_decode(file_get_contents($matriculasFile), true) ?: [];
-
-            // Registrar entrada en historial
-            $historial[] = [
-                'matricula' => $matricula,
-                'plaza' => $plaza,
-                'accion' => 'entrada',
-                'timestamp' => time(),
-                'admin' => $_SESSION['admin'] ?? null
-            ];
-
-            // Actualizar plaza
-            $coches[$matricula] = ['plaza' => $plaza, 'timestamp' => time()];
-
-            // Guardar matrícula en archivo de matrículas si no existe
-            if (!in_array($matricula, $matriculas)) {
-                $matriculas[] = $matricula;
-                file_put_contents($matriculasFile, json_encode($matriculas, JSON_PRETTY_PRINT));
-            }
-
-            file_put_contents($jsonFile, json_encode($coches, JSON_PRETTY_PRINT));
-            file_put_contents($historyFile, json_encode($historial, JSON_PRETTY_PRINT));
-
-            echo json_encode(['status' => 'success']);
+        if (!preg_match('/^[0-9BCDFGHJKLMNPRSTVWXYZ]{4}[0-9BCDFGHJKLMNPRSTVWXYZ]{3}$/', $matricula) || (!$isNumberedPlaza && !$isNonNumbered)) {
+            http_response_code(400);
+            echo json_encode(['status' => 'error', 'message' => 'Datos inválidos']);
             exit;
         }
 
-        http_response_code(400);
-        echo json_encode(['status' => 'error', 'message' => 'Datos inválidos']);
+        $blocked = json_decode(file_get_contents($blockedFile), true) ?: [];
+        $nonNumbered = json_decode(file_get_contents($nonNumberedFile), true) ?: [];
+
+        // Si es plaza no numerada, usar la plaza numerada más cercana para verificar bloqueos
+        $plazaNumerada = $isNumberedPlaza ? intval($plaza) : $nearestSpace;
+
+        // Verificar si la plaza está bloqueada
+        if ($plazaNumerada && isset($blocked[$plazaNumerada]) && !isset($_SESSION['admin'])) {
+            echo json_encode(['status' => 'error', 'message' => $blocked[$plazaNumerada] === 'cleaning' ? 'Plaza en limpieza' : 'Plaza en mantenimiento']);
+            exit;
+        }
+
+        $coches = json_decode(file_get_contents($jsonFile), true) ?: [];
+        $historial = json_decode(file_get_contents($historyFile), true) ?: [];
+        $matriculas = json_decode(file_get_contents($matriculasFile), true) ?: [];
+
+        // Registrar entrada en historial
+        $historial[] = [
+            'matricula' => $matricula,
+            'plaza' => $isNumberedPlaza ? intval($plaza) : 'NN-' . $nearestSpace,
+            'accion' => 'entrada',
+            'timestamp' => time(),
+            'admin' => $_SESSION['admin'] ?? null
+        ];
+
+        // Actualizar plaza
+        $coches[$matricula] = [
+            'plaza' => $isNumberedPlaza ? intval($plaza) : 'NN-' . $nearestSpace,
+            'plaza_numerada' => $plazaNumerada,
+            'timestamp' => time()
+        ];
+
+        // Guardar matrícula en archivo de matrículas si no existe
+        if (!in_array($matricula, $matriculas)) {
+            $matriculas[] = $matricula;
+            file_put_contents($matriculasFile, json_encode($matriculas, JSON_PRETTY_PRINT));
+        }
+
+        file_put_contents($jsonFile, json_encode($coches, JSON_PRETTY_PRINT));
+        file_put_contents($historyFile, json_encode($historial, JSON_PRETTY_PRINT));
+
+        echo json_encode(['status' => 'success']);
         exit;
     }
 
@@ -714,6 +792,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // Cargar datos para JS
 $coches = json_decode(file_get_contents($jsonFile), true) ?: [];
 $blocked = json_decode(file_get_contents($blockedFile), true) ?: [];
+$nonNumbered = json_decode(file_get_contents($nonNumberedFile), true) ?: [];
+$observations = json_decode(file_get_contents($observationsFile), true) ?: [];
 $isAdmin = isset($_SESSION['admin']);
 $role = $_SESSION['role'] ?? '';
 $reset_password = $_SESSION['reset_password'] ?? false;
@@ -758,6 +838,7 @@ $currentLanguage = $_SESSION['language'] ?? $defaultLanguage;
       --master-color: #9b59b6;
       --moderator-color: #3498db;
       --occupied-color: #f39c12;
+      --non-numbered-color: #9b59b6;
     }
 
     * {
@@ -823,7 +904,7 @@ $currentLanguage = $_SESSION['language'] ?? $defaultLanguage;
       width: 100%;
     }
 
-    input[type="text"], select, input[type="date"] {
+    input[type="text"], select, input[type="date"], input[type="number"] {
       flex: 1;
       min-width: 120px;
       padding: 10px 12px;
@@ -951,6 +1032,10 @@ $currentLanguage = $_SESSION['language'] ?? $defaultLanguage;
       transform: rotate(45deg);
     }
 
+    .legend-color.non-numbered {
+      background-color: var(--non-numbered-color);
+    }
+
     #mapa {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(25px, 1fr));
@@ -1042,6 +1127,25 @@ $currentLanguage = $_SESSION['language'] ?? $defaultLanguage;
       transform: rotate(45deg);
     }
 
+    .plaza.non-numbered {
+      background-color: var(--non-numbered-color);
+      color: white;
+      font-weight: bold;
+    }
+
+    .plaza.non-numbered.ocupada {
+      background-color: var(--non-numbered-color);
+      position: relative;
+    }
+
+    .plaza.non-numbered.ocupada::after {
+      content: "✓";
+      position: absolute;
+      bottom: -10px;
+      font-size: 10px;
+      color: var(--success-color);
+    }
+
     .plaza.resaltada {
       animation: pulse 1.5s infinite;
       box-shadow: 0 0 0 2px var(--secondary-color);
@@ -1115,7 +1219,7 @@ $currentLanguage = $_SESSION['language'] ?? $defaultLanguage;
       font-size: 0.9rem;
     }
 
-    .popup-content input {
+    .popup-content input, .popup-content textarea {
       width: 100%;
       padding: 10px;
       border: 1px solid #ddd;
@@ -1123,6 +1227,10 @@ $currentLanguage = $_SESSION['language'] ?? $defaultLanguage;
       margin-bottom: 12px;
       font-size: 14px;
       min-height: 44px;
+    }
+
+    .popup-content textarea {
+      min-height: 100px;
     }
 
     .popup-actions {
@@ -1509,6 +1617,20 @@ $currentLanguage = $_SESSION['language'] ?? $defaultLanguage;
       color: white;
     }
 
+    .non-numbered-checkbox {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .press-info {
+      font-size: 12px;
+      text-align: center;
+      margin-bottom: 10px;
+      color: #7f8c8d;
+    }
+
     @media (min-width: 481px) {
       h1 {
         font-size: 2rem;
@@ -1601,7 +1723,7 @@ $currentLanguage = $_SESSION['language'] ?? $defaultLanguage;
         gap: 10px;
       }
 
-      input[type="text"], select, input[type="date"] {
+      input[type="text"], select, input[type="date"], input[type="number"] {
         padding: 10px 15px;
         font-size: 16px;
       }
@@ -1702,6 +1824,7 @@ $currentLanguage = $_SESSION['language'] ?? $defaultLanguage;
     </div>
 
     <div class="legend" id="legendContainer"></div>
+    <div class="press-info"><?php echo t('press_space_info'); ?></div>
 
     <div class="controls">
       <div class="search-container">
@@ -1762,7 +1885,15 @@ $currentLanguage = $_SESSION['language'] ?? $defaultLanguage;
       <button class="popup-close" onclick="cerrarPopup('popupAparcar')">×</button>
       <h2><?php echo t('park_vehicle_title'); ?></h2>
       <p><?php echo t('enter_space_number'); ?></p>
-      <input type="number" id="plazaAparcar" min="1" max="900" placeholder="<?php echo t('space_number_placeholder'); ?>">
+      <div class="non-numbered-checkbox">
+        <input type="checkbox" id="nonNumberedCheckbox">
+        <label for="nonNumberedCheckbox"><?php echo t('non_numbered_checkbox'); ?></label>
+      </div>
+      <input type="number" id="plazaAparcar" placeholder="<?php echo t('space_number_placeholder'); ?>" min="1" max="900">
+      <input type="number" id="nearestSpace" placeholder="<?php echo t('nearest_space_placeholder'); ?>" min="1" max="900" style="display: none;">
+      <?php if ($isAdmin): ?>
+        <textarea id="observations" placeholder="<?php echo t('observations_placeholder'); ?>"></textarea>
+      <?php endif; ?>
       <div class="popup-actions">
         <button onclick="guardarNuevaPlaza()"><?php echo t('confirm'); ?></button>
       </div>
@@ -1932,6 +2063,19 @@ $currentLanguage = $_SESSION['language'] ?? $defaultLanguage;
     </div>
   </div>
 
+  <div id="popupObservaciones" class="popup">
+    <div class="popup-content">
+      <button class="popup-close" onclick="cerrarPopup('popupObservaciones')">×</button>
+      <h2><?php echo t('edit_observations'); ?></h2>
+      <input type="hidden" id="observationsSpace">
+      <textarea id="observationsText" placeholder="<?php echo t('observations_placeholder'); ?>"></textarea>
+      <div class="popup-actions">
+        <button class="cancel" onclick="cerrarPopup('popupObservaciones')"><?php echo t('cancel'); ?></button>
+        <button onclick="guardarObservaciones()"><?php echo t('save_observations'); ?></button>
+      </div>
+    </div>
+  </div>
+
   <div id="loginContainer" class="popup">
     <div class="popup-content">
       <button class="popup-close" onclick="cerrarPopup('loginContainer')">×</button>
@@ -1947,6 +2091,8 @@ $currentLanguage = $_SESSION['language'] ?? $defaultLanguage;
   <script>
     const coches = <?php echo json_encode($coches); ?>;
     const blockedPlazas = <?php echo json_encode($blocked); ?>;
+    const nonNumberedPlazas = <?php echo json_encode($nonNumbered); ?>;
+    const observations = <?php echo json_encode($observations); ?>;
     const isAdmin = <?php echo $isAdmin ? 'true' : 'false'; ?>;
     const role = '<?php echo $role; ?>';
     const reset_password = <?php echo $reset_password ? 'true' : 'false'; ?>;
@@ -2023,6 +2169,10 @@ $currentLanguage = $_SESSION['language'] ?? $defaultLanguage;
             <div class="legend-color cleaning"></div>
             <span><?php echo t('cleaning'); ?></span>
           </div>
+          <div class="legend-item">
+            <div class="legend-color non-numbered"></div>
+            <span><?php echo t('non_numbered'); ?></span>
+          </div>
         `;
       } else {
         legendContainer.innerHTML = `
@@ -2041,6 +2191,10 @@ $currentLanguage = $_SESSION['language'] ?? $defaultLanguage;
           <div class="legend-item">
             <div class="legend-color cleaning"></div>
             <span><?php echo t('cleaning'); ?></span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color non-numbered"></div>
+            <span><?php echo t('non_numbered'); ?></span>
           </div>
         `;
       }
@@ -2248,6 +2402,7 @@ $currentLanguage = $_SESSION['language'] ?? $defaultLanguage;
       const contenedor = document.getElementById('mapa');
       contenedor.innerHTML = '';
 
+      // Crear plazas numeradas (1-900)
       for (let i = 1; i <= 900; i++) {
         const div = document.createElement('div');
         div.className = 'plaza';
@@ -2263,11 +2418,18 @@ $currentLanguage = $_SESSION['language'] ?? $defaultLanguage;
             div.classList.add('bloqueada');
           }
           if (isAdmin) {
-            div.onclick = () => toggleBlockPlaza(i, blockedPlazas[i]);
+            div.onclick = () => {
+              if (confirm('¿Qué tipo de bloqueo deseas aplicar?')) {
+                toggleBlockPlaza(i, 'blocked');
+              } else {
+                toggleBlockPlaza(i, 'cleaning');
+              }
+            };
           }
         } else {
           // Verificar si la plaza está ocupada
-          const matriculaEnPlaza = Object.entries(coches).find(([_, datos]) => datos.plaza === i);
+          const matriculaEnPlaza = Object.entries(coches).find(([_, datos]) =>
+            (typeof datos.plaza === 'number' && datos.plaza === i));
 
           if (matriculaEnPlaza) {
             if (settings.viewMode === 'detailed' && settings.showParkingTime) {
@@ -2295,15 +2457,12 @@ $currentLanguage = $_SESSION['language'] ?? $defaultLanguage;
               `;
               div.appendChild(info);
             }
-          } else if (isAdmin) {
-            div.onclick = () => {
-              if (confirm('¿Qué tipo de bloqueo deseas aplicar?')) {
-                toggleBlockPlaza(i, 'blocked');
-              } else {
-                toggleBlockPlaza(i, 'cleaning');
-              }
-            };
           }
+
+          // Mostrar observaciones al hacer clic
+          div.onclick = () => {
+            mostrarObservaciones(i);
+          };
         }
 
         // Aplicar filtro
@@ -2331,6 +2490,41 @@ $currentLanguage = $_SESSION['language'] ?? $defaultLanguage;
 
         contenedor.appendChild(div);
       }
+
+      // Crear plazas no numeradas
+      Object.entries(coches).forEach(([matricula, datos]) => {
+        if (typeof datos.plaza !== 'number') {
+          const plazaNumerada = datos.plaza_numerada;
+          if (plazaNumerada) {
+            const div = document.createElement('div');
+            div.className = 'plaza non-numbered ocupada';
+            div.textContent = 'NN';
+            div.id = `plaza-nn-${matricula}`;
+            div.dataset.plaza = plazaNumerada;
+            
+            // Posicionar al lado de la plaza numerada
+            const plazaRef = document.getElementById(`plaza-${plazaNumerada}`);
+            if (plazaRef) {
+              plazaRef.insertAdjacentElement('afterend', div);
+            }
+
+            if (window.innerWidth > 480) {
+              const info = document.createElement('div');
+              info.className = 'plaza-info';
+              info.innerHTML = `
+                <div>${matricula}</div>
+                <div>${formatDate(datos.timestamp)}</div>
+                <div>${formatDuration(datos.timestamp)}</div>
+              `;
+              div.appendChild(info);
+            }
+
+            div.onclick = () => {
+              mostrarObservaciones(plazaNumerada);
+            };
+          }
+        }
+      });
 
       actualizarEstadisticas();
     }
@@ -2364,11 +2558,18 @@ $currentLanguage = $_SESSION['language'] ?? $defaultLanguage;
       if (coches[matriculaLimpia]) {
         matriculaPendiente = matriculaLimpia;
         document.getElementById('matriculaEncontrada').textContent = matriculaLimpia;
-        document.getElementById('plazaEncontrada').textContent = coches[matriculaLimpia].plaza.toString().padStart(3, '0');
+
+        // Mostrar plaza numerada si es no numerada
+        const plaza = coches[matriculaLimpia].plaza;
+        const plazaMostrar = typeof plaza === 'number' ? plaza : (coches[matriculaLimpia].plaza_numerada || plaza);
+
+        document.getElementById('plazaEncontrada').textContent = typeof plazaMostrar === 'number' ?
+          plazaMostrar.toString().padStart(3, '0') : plazaMostrar;
+
         mostrarPopup('popupCocheEncontrado');
 
-        const plaza = coches[matriculaLimpia].plaza;
-        const div = document.getElementById('plaza-' + plaza);
+        const div = document.getElementById(`plaza-${plazaMostrar}`) || 
+                    document.getElementById(`plaza-nn-${matriculaLimpia}`);
         if (div) {
           div.classList.add('resaltada');
           div.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -2452,7 +2653,7 @@ $currentLanguage = $_SESSION['language'] ?? $defaultLanguage;
           </div>
           <div>
             <span class="history-action ${item.accion}">${item.accion === 'entrada' ? '<?php echo t('entry'); ?>' : '<?php echo t('exit'); ?>'}</span>
-            <span><?php echo t('space'); ?> ${item.plaza.toString().padStart(3, '0')}</span>
+            <span><?php echo t('space'); ?> ${typeof item.plaza === 'number' ? item.plaza.toString().padStart(3, '0') : item.plaza}</span>
           </div>
         `;
         contenido.appendChild(div);
@@ -2468,24 +2669,41 @@ $currentLanguage = $_SESSION['language'] ?? $defaultLanguage;
     }
 
     function guardarNuevaPlaza() {
-      const plazaInput = document.getElementById('plazaAparcar');
-      let plaza = plazaInput.value;
+      const plazaInput = document.getElementById('plazaAparcar').value.trim();
+      const isNonNumbered = document.getElementById('nonNumberedCheckbox').checked;
+      const nearestSpace = document.getElementById('nearestSpace').value;
+      const observations = document.getElementById('observations')?.value || '';
 
-      plaza = parseInt(plaza);
-      if (!plaza || plaza < 1 || plaza > 900) {
+      // Validar plaza (debe ser número 1-900)
+      const isNumberedPlaza = !isNonNumbered && !isNaN(plazaInput) && plazaInput > 0 && plazaInput <= 900;
+
+      if (!isNumberedPlaza && !isNonNumbered) {
         alert('<?php echo t('invalid_space_number'); ?>');
         return;
       }
 
-      if (blockedPlazas[plaza] && !isAdmin) {
-        alert(blockedPlazas[plaza] === 'cleaning' ? '<?php echo t('space_cleaning'); ?>' : '<?php echo t('space_blocked'); ?>');
+      if (isNonNumbered && (!nearestSpace || nearestSpace < 1 || nearestSpace > 900)) {
+        alert('<?php echo t('invalid_space_number'); ?>');
         return;
       }
 
-      const plazaOcupada = Object.values(coches).some(coche => coche.plaza === plaza);
-      if (plazaOcupada) {
-        if (!confirm(`<?php echo t('space_already_occupied'); ?>`.replace('{space}', plaza.toString().padStart(3, '0')))) {
-          return;
+      const plazaNumerada = isNumberedPlaza ? parseInt(plazaInput) : parseInt(nearestSpace);
+
+      if (blockedPlazas[plazaNumerada] && !isAdmin) {
+        alert(blockedPlazas[plazaNumerada] === 'cleaning' ? '<?php echo t('space_cleaning'); ?>' : '<?php echo t('space_blocked'); ?>');
+        return;
+      }
+
+      // Solo verificar ocupación si es plaza numerada
+      if (isNumberedPlaza) {
+        const plazaOcupada = Object.values(coches).some(coche =>
+          typeof coche.plaza === 'number' && coche.plaza === plazaNumerada);
+
+        if (plazaOcupada) {
+          const plazaStr = plazaNumerada.toString().padStart(3, '0');
+          if (!confirm(`<?php echo t('space_already_occupied'); ?>`.replace('{space}', plazaStr))) {
+            return;
+          }
         }
       }
 
@@ -2494,17 +2712,35 @@ $currentLanguage = $_SESSION['language'] ?? $defaultLanguage;
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded'
         },
-        body: `action=guardar&matricula=${encodeURIComponent(matriculaPendiente)}&plaza=${plaza}`
+        body: `action=guardar&matricula=${encodeURIComponent(matriculaPendiente)}&plaza=${isNumberedPlaza ? plazaInput : 'NN'}&non_numbered=${isNonNumbered}&nearest_space=${plazaNumerada}`
       })
       .then(res => res.json())
       .then(data => {
         if (data.status === 'success') {
-          coches[matriculaPendiente] = { plaza, timestamp: Math.floor(Date.now() / 1000) };
+          coches[matriculaPendiente] = {
+            plaza: isNumberedPlaza ? parseInt(plazaInput) : 'NN-' + plazaNumerada,
+            plaza_numerada: plazaNumerada,
+            timestamp: Math.floor(Date.now() / 1000)
+          };
+
+          // Guardar observaciones si es admin
+          if (isAdmin && observations) {
+            fetch('index.php', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+              },
+              body: `action=save_observations&space=${plazaNumerada}&observations=${encodeURIComponent(observations)}`
+            });
+          }
+
           cerrarPopup('popupAparcar');
-          plazaInput.value = '';
+          document.getElementById('plazaAparcar').value = '';
+          document.getElementById('nearestSpace').value = '';
+          document.getElementById('nonNumberedCheckbox').checked = false;
           crearMapa();
 
-          const div = document.getElementById('plaza-' + plaza);
+          const div = document.getElementById(isNumberedPlaza ? `plaza-${plazaNumerada}` : `plaza-nn-${matriculaPendiente}`);
           if (div) {
             div.classList.add('resaltada');
             div.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -2982,6 +3218,43 @@ $currentLanguage = $_SESSION['language'] ?? $defaultLanguage;
       });
     }
 
+    function mostrarObservaciones(space) {
+      document.getElementById('observationsSpace').value = space;
+      document.getElementById('observationsText').value = observations[space] || '';
+      
+      if (isAdmin) {
+        mostrarPopup('popupObservaciones');
+      } else if (observations[space]) {
+        alert(`<?php echo t('location_info'); ?>`.replace('{observations}', observations[space]));
+      }
+    }
+
+    function guardarObservaciones() {
+      const space = document.getElementById('observationsSpace').value;
+      const text = document.getElementById('observationsText').value;
+
+      fetch('index.php', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: `action=save_observations&space=${space}&observations=${encodeURIComponent(text)}`
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === 'success') {
+          observations[space] = text;
+          cerrarPopup('popupObservaciones');
+        } else {
+          alert('<?php echo t('error'); ?>: ' + (data.message || '<?php echo t('unknown_error'); ?>'));
+        }
+      })
+      .catch(error => {
+        console.error('<?php echo t('error'); ?>:', error);
+        alert('<?php echo t('connection_error'); ?>');
+      });
+    }
+
     // Inicialización cuando el DOM está cargado
     document.addEventListener('DOMContentLoaded', function() {
       // Cargar configuración
@@ -3032,6 +3305,22 @@ $currentLanguage = $_SESSION['language'] ?? $defaultLanguage;
 
       asignarEvento('confirmPassword', 'keypress', function(e) {
         if (e.key === 'Enter') restablecerPassword();
+      });
+
+      // Toggle para plazas no numeradas
+      document.getElementById('nonNumberedCheckbox').addEventListener('change', function() {
+        const plazaInput = document.getElementById('plazaAparcar');
+        const nearestSpaceInput = document.getElementById('nearestSpace');
+        
+        if (this.checked) {
+          plazaInput.placeholder = '<?php echo t('non_numbered_checkbox'); ?>';
+          nearestSpaceInput.style.display = 'block';
+          plazaInput.style.display = 'none';
+        } else {
+          plazaInput.placeholder = '<?php echo t('space_number_placeholder'); ?>';
+          nearestSpaceInput.style.display = 'none';
+          plazaInput.style.display = 'block';
+        }
       });
 
       // Configuración inicial
